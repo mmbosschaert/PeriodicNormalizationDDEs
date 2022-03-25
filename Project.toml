@@ -1,0 +1,9 @@
+name = "DDEBifTool"
+uuid = "db37f8d4-3181-4d44-9749-67462466d3c5"
+authors = ["mmbosschaert <maikel.bosschaert@uhasselt.be>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
