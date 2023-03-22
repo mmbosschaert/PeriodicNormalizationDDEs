@@ -4,6 +4,12 @@ authors = ["mmbosschaert <maikel.bosschaert@uhasselt.be>"]
 version = "0.1.0"
 
 [deps]
+GaussQuadrature = "d54b0c1a-921d-58e0-8e36-89d8069c0969"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+NonlinearEigenproblems = "067cfa3b-fa88-53b2-a873-5b23b3a16e31"
+NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
