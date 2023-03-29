@@ -58,3 +58,16 @@ function multipliers(jet, point, τs)
     deleteat!(vals,findmin(abs.(vals .- 1.0))[2])
     @set point.stability = vals 
 end
+
+# not used yet
+function monodromy_matrix(jet, point, τs)
+    jac = defsystem_psol_jac_no_mod(jet,point,τs)
+    s1,s2=size(jac)
+    n_ext=s2-s1
+    n2_ext=max(n_ext-s1,0)
+    B=blockdiag(sparse(1.0I, n2_ext, n2_ext),sparse(jac[1:s1,n_ext+1:s2]))
+    Atop=[spzeros(n2_ext,s1) sparse(1.0I, n2_ext, n2_ext)]
+    A=[Atop[:,1:n_ext];-jac[1:s1,1:n_ext]]
+    Ptau=[spzeros(n_ext,max(0,2*s1-s2)) sparse(1.0I, n_ext, n_ext)]
+    Ptau*(B\Matrix(A*sparse(1.0I, n_ext, n_ext)))
+end

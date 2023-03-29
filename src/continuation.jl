@@ -146,9 +146,12 @@ function continue_psol!(branch,f,df,V;δ=1,MaxNumberofSteps=100,δmin=0.001,δma
             break
         end
 
-
         # condition on convergence here
         iterations < 5 ? δ *= 1.2 : δ /= 1.2
+
+        if δ > δmax
+            δ = δmax
+        end
 
         psol_corrected = psol([reshape(x₀[1:end-2],2,:)[:,j] for j in 1:length(psol_guess.mesh)], 
                               [psol_guess.parameters[1]; x₀[end-1]], 
@@ -173,7 +176,7 @@ function continue_psol!(branch,f,df,V;δ=1,MaxNumberofSteps=100,δmin=0.001,δma
 
         println("Step $step: iterations: $iterations stepsize: $δ")
 
-        if δ < 1e-15
+        if δ < δmin
             println("Stepsize to small: δ = $δ")
             break
         end
@@ -229,11 +232,203 @@ function continue_psol_fold_β!(branch,f,df,V;δ=1,MaxNumberofSteps=100,δmin=0.
 
         println("Step $step: iterations: $iterations stepsize: $δ")
 
-        if δ < 1e-15
+        if δ > δmax
+            δ = δmax
+        end
+        if δ < δmin
             println("Stepsize to small: δ = $δ")
             break
         end
     end
 end
 
+# function continue_psol_pd!(branch,f,df,V;δ=1,MaxNumberofSteps=100,δmin=0.001,δmax=1.2)
+# 
+#     pd_guess = branch.points[end]
+#     ncol = pd_guess.ncol
+#     ntst = convert(Int,(length(pd_guess.profile)-1)/ncol)
+#     dims = length(pd_guess.profile[1])
+# 
+#     iterations=0
+#     for step = 1:MaxNumberofSteps
+# 
+#         # step != 1 || length(branch.points) != 0 ?  x₀ += δ₀*V : x₀
+#         pd_guess = branch.points[end]
+#         x₀ = [vcat(pd_guess.profile...); vcat(pd_guess.eigenvector...); pd_guess.parameters; pd_guess.period ...]
+#         x₀ += δ*V # new guess
+#         x₀, iterations, V, converged  = newton(f, df, x₀, V, branch.points[end]; tol=1e-8)
+# 
+#         if ~converged
+#             println("No convergence")
+#             break
+#         end
+# 
+#         # condition on convergence here
+#         iterations < 5 ? δ *= 1.2 : δ /= 1.2
+# 
+#         if δ > δmax
+#             δ = δmax
+#         end
+# 
+#         pd_corrected = psol_pd([reshape(x₀[1:dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
+#                           [reshape(x₀[dims*(ntst*ncol+1)+1:2dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
+#                           x₀[end-2:end-1], branch.points[end].mesh, x₀[end], 
+#                           branch.points[end].ncol, nothing, nothing)
+# 
+#         push!(branch.points, pd_corrected)
+#         push!(branch.tangents, V)
+#         push!(branch.stepsizes, δ)
+# 
+#         # if step % 25 == 0
+#         #     println("Generation new mesh")
+#         #     τ, hom, vpsnew = adaptmeshHom(reshape(x₀[1:dims*(N*m+1)], dims, N*m+1),
+#         #                                   reshape(V[1:dims*(N*m+1)], dims, N*m+1), τ, N, m)
+# 
+#         #     V[1:dims*(N*m+1)] = vpsnew
+# 
+#         #     # update solution
+#         #     x₀[1:dims*(N*m+1)] = hom
+#         #     branch.points[end] = x₀
+#         #     branch.meshes[end] = τ
+#         # end
+# 
+#         println("Step $step: iterations: $iterations stepsize: $δ")
+# 
+#         if δ < δmin
+#             println("Stepsize to small: δ = $δ")
+#             break
+#         end
+# 
+#     end
+# end
 
+function continue_psol_ns!(branch,f,df,V;δ=1,MaxNumberofSteps=100,δmin=0.001,δmax=1.2)
+
+    ns_guess = branch.points[end]
+    ncol = ns_guess.ncol
+    ntst = convert(Int,(length(ns_guess.profile)-1)/ncol)
+    dims = length(ns_guess.profile[1])
+
+    iterations=0
+    for step = 1:MaxNumberofSteps
+
+        # step != 1 || length(branch.points) != 0 ?  x₀ += δ₀*V : x₀
+        ns_guess = branch.points[end]
+        x₀ = [vcat(ns_guess.profile...); vcat(ns_guess.eigenvector...); ns_guess.parameters; ns_guess.period; ns_guess.omega]
+        x₀ += δ*V # new guess
+        x₀, iterations, V, converged  = newton(f, df, x₀, V, branch.points[end]; tol=1e-8)
+
+        if ~converged
+            println("No convergence")
+            break
+        end
+
+        # condition on convergence here
+        iterations < 5 ? δ *= 1.2 : δ /= 1.2
+
+        if δ > δmax
+            δ = δmax
+        end
+
+        ns_corrected = psol_ns(
+                    [c[:] for c in eachcol(reshape(x₀[1:dims*(ntst*ncol+1)],dims,:))],
+                    [c[:] for c in eachcol(reshape(x₀[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                    x₀[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                    ns_guess.mesh, 
+                    x₀[3*dims*(ntst*ncol+1)+3],
+                    ns_guess.ncol, 
+                    ns_guess.stability,
+                    ns_guess.nmfm,
+                    x₀[3*dims*(ntst*ncol+1)+4])
+
+        push!(branch.points, ns_corrected)
+        push!(branch.tangents, V)
+        push!(branch.stepsizes, δ)
+
+        # if step % 25 == 0
+        #     println("Generation new mesh")
+        #     τ, hom, vpsnew = adaptmeshHom(reshape(x₀[1:dims*(N*m+1)], dims, N*m+1),
+        #                                   reshape(V[1:dims*(N*m+1)], dims, N*m+1), τ, N, m)
+
+        #     V[1:dims*(N*m+1)] = vpsnew
+
+        #     # update solution
+        #     x₀[1:dims*(N*m+1)] = hom
+        #     branch.points[end] = x₀
+        #     branch.meshes[end] = τ
+        # end
+
+        println("Step $step: iterations: $iterations stepsize: $δ")
+
+        if δ < δmin
+            println("Stepsize to small: δ = $δ")
+            break
+        end
+
+    end
+end
+
+function continue_psol_pd!(branch,f,df,V;δ=1,MaxNumberofSteps=100,δmin=0.001,δmax=1.2)
+
+    pd_guess = branch.points[end]
+    ncol = pd_guess.ncol
+    ntst = convert(Int,(length(pd_guess.profile)-1)/ncol)
+    dims = length(pd_guess.profile[1])
+
+    iterations=0
+    for step = 1:MaxNumberofSteps
+
+        # step != 1 || length(branch.points) != 0 ?  x₀ += δ₀*V : x₀
+        pd_guess = branch.points[end]
+        x₀ = [vcat(pd_guess.profile...); vcat(pd_guess.eigenvector...); pd_guess.parameters; pd_guess.period]
+        x₀ += δ*V # new guess
+        x₀, iterations, V, converged  = newton(f, df, x₀, V, branch.points[end]; tol=1e-8)
+
+        if ~converged
+            println("No convergence")
+            break
+        end
+
+        # condition on convergence here
+        iterations < 5 ? δ *= 1.2 : δ /= 1.2
+
+        if δ > δmax
+            δ = δmax
+        end
+
+        pd_corrected = psol_pd(
+                    [c[:] for c in eachcol(reshape(x₀[1:dims*(ntst*ncol+1)],dims,:))],
+                    [c[:] for c in eachcol(reshape(x₀[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                    x₀[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                    pd_guess.mesh, 
+                    x₀[3*dims*(ntst*ncol+1)+3],
+                    pd_guess.ncol, 
+                    pd_guess.stability,
+                    pd_guess.nmfm)
+
+        push!(branch.points, pd_corrected)
+        push!(branch.tangents, V)
+        push!(branch.stepsizes, δ)
+
+        # if step % 25 == 0
+        #     println("Generation new mesh")
+        #     τ, hom, vpsnew = adaptmeshHom(reshape(x₀[1:dims*(N*m+1)], dims, N*m+1),
+        #                                   reshape(V[1:dims*(N*m+1)], dims, N*m+1), τ, N, m)
+
+        #     V[1:dims*(N*m+1)] = vpsnew
+
+        #     # update solution
+        #     x₀[1:dims*(N*m+1)] = hom
+        #     branch.points[end] = x₀
+        #     branch.meshes[end] = τ
+        # end
+
+        println("Step $step: iterations: $iterations stepsize: $δ")
+
+        if δ < δmin
+            println("Stepsize to small: δ = $δ")
+            break
+        end
+
+    end
+end

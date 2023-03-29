@@ -75,6 +75,7 @@ function newton(f, df, x₀, V, x_ref; tol=1e-8, maxiterations=20)
         end
         jac = df(x₀,x_ref)
         jac[end,:] = V'
+
         D = jac\[fx [zeros(length(V)-1); 1.0]]
         dx = D[:,1]
         V = D[:,2]/norm(D[:,2])
