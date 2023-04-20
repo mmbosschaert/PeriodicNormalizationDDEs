@@ -163,7 +163,7 @@ function ns_w_approx(jet,periodicsolution,τs)
     w = zeros(2dims*(ntst*ncol+1))
     w = reshape(w,4,:)
     w = Vector{eltype(w)}[eachcol(w)...] 
-    jac = DDEBifTool.differential_equation_part_complex(jet,w,periodicsolution,τs)
+    jac = differential_equation_part_complex(jet,w,periodicsolution,τs)
     # w = qr([jac[1:end-1,:] rand(2dims*(ntst*ncol+1)); rand(2dims*(ntst*ncol+1)+1)']').Q[:,end]
     # w = qr(jac[1:end,:]').Q[:,end]
     # @show display([zeros(2dims*(ntst*ncol+1)); 1.0])
@@ -175,15 +175,38 @@ function ns_w_approx(jet,periodicsolution,τs)
     _, s, V = svd(jac)
     indxmin = last(findmin(s))
     w = V[:, indxmin]
-    @show display(jac[1:end-1,:]*w[1:end])
+    # @show display(jac[1:end-1,:]*w[1:end])
     w = Vector{eltype(w)}[eachcol(reshape(w[1:end],4,:))...] 
-    wζ =  interpolate.(colpoints[:],0.0,Ref(w),Ref(ts),ncol)
+    wζ = interpolate.(colpoints[:],0.0,Ref(w),Ref(ts),ncol)
         
     testintervals = ts[1:ncol:end]
     wi = repeat(testintervals[2:end] - testintervals[1:end-1],1,ncol)'[:]
-    c = sqrt(1.0 / sum(wi .* repeat(weights,ntst) .* dot.(wζ,wζ)))
 
-    @set periodicsolution.eigenvector = c*(w  + [[p[dims+1:end]; -p[1:dims]] for p in w])
+    uζ = [w[1:dims] for w in wζ]
+    vζ = [w[dims+1:2dims] for w in wζ]
+
+    ∫(u,v) = sum(wi .* repeat(weights,ntst) .* dot.(u,v))/2
+
+    # c3 = (∫<u,u> + <v,v> + sqrt( (∫<u,u> + <v,v>)^2 - 8(∫<u,v> dτ) / (∫<v,v> - <u,u> dτ)^2)) / 4 
+    # c3 = ∫(uζ,uζ) + ∫(vζ,vζ) - √( (∫(uζ,uζ) + ∫(vζ,vζ))^2 - 8∫(uζ,vζ) / (∫(vζ,vζ) - ∫(uζ,uζ))^2) / 4 
+    # c2 = sqrt(c3)
+    # c1 = √(1/(∫(uζ,uζ) + ∫(vζ,vζ)) - c3)
+
+    A = ∫(wζ,wζ)
+    B = ∫(vζ,vζ) - ∫(vζ,vζ)
+    C = ∫(uζ,vζ)
+
+    sqrt1 = (1 - B/sqrt(B^2 + 4*C^2))/A
+    sqrt2 = (1 + B/sqrt(B^2 + 4*C^2))/A
+    if sqrt1 >= 0.0
+        c1 = -(sqrt(sqrt1)/sqrt(2))
+        c2 = (C*sqrt(2*sqrt1))/(B - sqrt(B^2 + 4*C^2))
+    else
+        c1 = -(sqrt(sqrt2)/sqrt(2))
+        c2 = (C*sqrt(2*sqrt2))/(B - sqrt(B^2 + 4*C^2))
+    end
+
+    @set periodicsolution.eigenvector = c1*w  + c2*[[p[dims+1:end]; -p[1:dims]] for p in w]
 end
 
 function differential_equation_part_complex(jet,w,periodicsolution,τs)
@@ -322,19 +345,55 @@ function ns_res_jac(jet,periodicsolution,periodicsolution_res,τs)
         # thus if (u,v) is a solutions, then so is c1 (u,v) + c2 (v,-u)
         # 
         # We can use this freedom two satisfy the following normalization conditions
-        # 1. ∫ <u,u> + <v,v>  dτ - 1 == 0
-        # 2. ∫ <u,v> = 0
+        # 1. ∫ <u,u> + <v,v> dτ - 1 == 0
+        # 2. ∫ <u,v> dτ = 0
         # 
         # Indeed, we have that
         #
-        # 1. (c1^2 + c2^2) ∫ <u,u> + <v,v> dτ - 1 == 0
-        # 2. (c1^2 - c2^2) ∫ <u,v> dτ  = 0
-        #
-        # Thus let c1^2 == c2^2, so that the second intergral vanishes. This yields that
-        # 1. 2 c1^2  ∫ <u,u> + <v,v> dτ - 1 == 0
+        # 2. ∫ <c1 u + c2 v,c1 v - c2 u> dτ == 0
+        # 2. ∫ (c1^2 - c2^2) <u,v> + c1 c2 (<v,v> - <u,u>) dτ == 0
         # 
-        # Solveing for c1 yields
-        # 1. c1  == sqrt(1/∫ <u,u> + <v,v> dτ/2) (Nothing that c1 > 0)
+        # 1. (c1^2 + c2^2) ∫ <u,u> + <v,v> dτ - 1 == 0
+        # 2. (c1^2 - c2^2) ∫ <u,v> dτ + c1 c2 ∫ <v,v> - <u,u> dτ == 0
+        #
+        # Let A = ∫ <u,u> + <v,v> dτ, B = ∫ <v,v> - <u,u> dτ, and C = ∫ <u,v> dτ 
+        #
+        # 1. (c1^2 + c2^2) A - 1 == 0
+        # 2. (c1^2 - c2^2) C + c1 c2 B == 0
+        #
+        # It follows that 
+        #
+        # c1^2 = 1/A - c2^2
+        #
+        # Assuming 1/A - c^2 > 0, we have that
+        #
+        # c1 = ± √(1/A - c2^2)
+        #
+        # Subtituting into the (2) yields
+        #
+        # 2. (1/A - 2 c2^2) C ± √(1/A - c2^2) c2 B == 0
+        #
+        #
+        # Now solven this ...
+        #
+        # Let c1^2 = 1/∫ <u,u> + <v,v> dτ - c2^2
+        # i.e. c1 = ± √ (1/∫ <u,u> + <v,v> dτ - c2^2)
+        #
+        # Then
+        #
+        # 2. (1/∫ <u,u> + <v,v> dτ - 2 c2^2) ∫ <u,v> dτ + ± √ (1/∫ <u,u> + <v,v> dτ - c2^2) c2 ∫ <v,v> - <u,u> dτ == 0
+        # 2. ∫ <u,v> dτ + ± √ (∫ <u,u> + <v,v> dτ - 2 c2^2) c2 ∫ <v,v> - <u,u> dτ == 0
+        # 2. ± √ (∫ <u,u> + <v,v> dτ - 2 c2^2) c2  == - ∫ <u,v> dτ / ( ∫ <v,v> - <u,u> dτ )
+        # 2. (∫ <u,u> + <v,v> dτ - 2 c2^2) c2^2  == (∫ <u,v> dτ / ( ∫ <v,v> - <u,u> dτ ))^2
+        #
+        # Let c3 = c2^2
+        #
+        # 2. (∫ <u,u> + <v,v> dτ - 2 c3) c3  == (∫ <u,v> dτ / ( ∫ <v,v> - <u,u> dτ ))^2
+        #
+        # 2. -2 c3^2 + c3 (∫ <u,u> + <v,v> dτ) - (∫ <u,v> dτ / ( ∫ <v,v> - <u,u> dτ ))^2 == 0
+        # 2. 2 c3^2 - c3 (∫ <u,u> + <v,v> dτ) + (∫ <u,v> dτ / ( ∫ <v,v> - <u,u> dτ ))^2 == 0
+        #
+        # c3 = (∫<u,u> + <v,v> + sqrt( (∫<u,u> + <v,v>)^2 - 8(∫<u,v> dτ) / (∫<v,v> - <u,u> dτ)^2)) / 4 
 
         dMj_re = jet.D2v1(hcat(γζ...),par,vcat(v11...))
         dMj_im = jet.D2v1(hcat(γζ...),par,vcat(v12...))
@@ -388,4 +447,93 @@ function ns_res_jac(jet,periodicsolution,periodicsolution_res,τs)
     jac[dims*(ntst*ncol+1) + 1 .+ range(2*dims*ntst*ncol+1,2*dims*(ntst*ncol+1)),end-2*dims+1-4:end-4] = -diagm(ones(2*dims))
 
     jac
+end
+
+function vec(p::psol_ns,_)
+    [vcat(p.profile...); vcat(p.eigenvector...); p.parameters; p.period; p.omega]
+end
+
+function vec_to_point(v,p_prev::psol_ns,_)
+    dims = length(p_prev.profile[1])
+    ncol = p_prev.ncol
+    ntst = convert(Int,(length(p_prev.profile)-1)/ncol)
+    psol_ns(
+            [c[:] for c in eachcol(reshape(v[1:dims*(ntst*ncol+1)],dims,:))],
+            [c[:] for c in eachcol(reshape(v[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+            v[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+            p_prev.mesh, 
+            v[3*dims*(ntst*ncol+1)+3],
+            p_prev.ncol, 
+            p_prev.stability,
+            p_prev.nmfm,
+            v[3*dims*(ntst*ncol+1)+4])
+end
+
+
+function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250)
+
+    ns_guess = psol_to_ns(ns_guess)
+    ns_guess = ns_w_approx(jet,ns_guess,τs);
+
+    x₀ = vec(ns_guess,nothing)
+
+    #v = ns_tangent(jet,ns_guess,τs);
+    #x₀ = [vcat(ns_guess.profile...); v[1:end-1]; ns_guess.parameters; ns_guess.period; v[end] ...]
+
+    dims = length(ns_guess.profile[1])
+    ncol = ns_guess.ncol
+    ntst = convert(Int,(length(ns_guess.profile)-1)/ncol)
+
+    f = (x,psol_prev) -> vcat(
+    [psol_ns_res(jet,
+            psol_ns(
+                [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                ns_guess.mesh, 
+                x[3*dims*(ntst*ncol+1)+3],
+                ns_guess.ncol, 
+                ns_guess.stability,
+                ns_guess.nmfm,
+                x[3*dims*(ntst*ncol+1)+4]),
+            psol_prev,
+            τs); 0.0] ...)
+
+    df = (x,psol1) -> ns_res_jac(jet,
+                
+                        psol_ns(
+                            [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                            [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                            x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                            ns_guess.mesh, 
+                            x[3*dims*(ntst*ncol+1)+3],
+                            ns_guess.ncol, 
+                            ns_guess.stability,
+                            ns_guess.nmfm,
+                            x[3*dims*(ntst*ncol+1)+4]),
+            psol1,τs)
+
+    # solve with own newton
+    jac = df(x₀,ns_guess)
+    V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
+    x₀new, _, V_new = newton(f, df, x₀, V, ns_guess; tol=1e-8)
+
+    # convert ns_guess to psol_ns
+    ns_corrected = vec_to_point(x₀new, ns_guess,nothing)
+
+    # continuation with own newton
+    ns_branch = (points = psol_ns[], tangents = [], stepsizes = [], 
+        f = f, df = df,
+        parameterbounds=parameterbounds,
+        δ=δ,
+        δmin=δmin,
+        δmax=δmax,
+        MaxNumberofSteps = MaxNumberofSteps,
+        con_par = nothing 
+    )
+
+    push!(ns_branch.points, ns_corrected)
+    push!(ns_branch.tangents, V_new)
+    push!(ns_branch.stepsizes, 0.0)
+    ns_branch
 end

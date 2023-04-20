@@ -9,6 +9,8 @@ m = length(τs)
 α = vec(reshape(Symbolics.get_variables(α), 2, 1))
 
 @variables v₁[1:n*length(τs)] v₂[1:n*length(τs)] v₃[1:n*length(τs)] p₁[1:2] p₂[1:2] p₃[1:2]
+
+# TODO: replace vcat with Symbolics.scalarize
 v₁ = vcat(v₁)
 v₂ = vcat(v₂)
 v₃ = vcat(v₃)

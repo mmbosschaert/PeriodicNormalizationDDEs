@@ -8,7 +8,7 @@ struct psol{T}
     nmfm::Union{ComplexF64,Nothing}
 end
 
-struct psol_fold{T}
+struct psol_pd{T}
     profile::Vector{Vector{T}}
     eigenvector::Vector{Vector{T}}
     parameters::Vector{T}
@@ -16,8 +16,144 @@ struct psol_fold{T}
     period::T
     ncol::Int
     stability::Union{Vector{ComplexF64},Nothing}
-    nmfm::Union{ComplexF64,Nothing}
-    beta::T
+    nmfm::Union{Float64,Nothing}
+    omega::T
+end
+
+
+function vec(p::psol,con_par)
+    [vcat(p.profile...); p.parameters[con_par]; p.period ...]
+end
+
+function vec_to_point(vec,point_prev::psol,con_par)
+    psol(
+            [reshape(vec[1:end-2],2,:)[:,j] for j in 1:length(point_prev.mesh)], 
+            [point_prev.parameters[1:con_par-1]; vec[end-1]; point_prev.parameters[con_par+1:end]], 
+             point_prev.mesh, vec[end], point_prev.ncol, nothing, nothing)
+end
+
+function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, ntst = 20, ncol = 3)
+
+    # define fine mesh
+    t = range(0.0,1.0, ntst*ncol + 1)
+    profile = 1e-03*imag([hopf_point.v*s for s in exp.(im*2π*t)])
+    T = 2pi/abs(hopf_point.ω)
+    psol_guess = psol(profile, hopf_point.parameters, collect(t), T, ncol, nothing, nothing)
+    psol_res(jet,psol_guess,psol_guess,τs)
+
+    f = (x,psol1) -> vcat([
+        psol_res(jet,
+            psol([reshape(x[1:end-2],2,:)[:,j] for j in 1:length(psol1.mesh)],
+            [psol1.parameters[1:con_par-1]; x[end-1]; psol1.parameters[con_par+1:end]], psol1.mesh, x[end], 
+                psol1.ncol, nothing, nothing),psol1,τs)...; 0.0] ...)
+
+    df = (x,psol1) -> defsystem_psol_jac(jet,
+            psol([reshape(x[1:end-2],2,:)[:,j] for j in 1:length(psol1.mesh)],
+            [psol1.parameters[1:con_par-1]; x[end-1]; psol1.parameters[con_par+1:end]], psol1.mesh, x[end], 
+                psol1.ncol, nothing, nothing),psol1,τs)
+
+    x₀ = vec(psol_guess,con_par)
+    jac = df(x₀,psol_guess)
+    V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
+
+    x₀new, _, V_new = newton(f, df, x₀, V, psol_guess; tol=1e-8)
+    psol_corrected = vec_to_point(x₀new,psol_guess,con_par)
+
+    # continuation with own newton
+    psol_branch = (points = psol[],
+        tangents = [],
+        stepsizes = [],
+        f = f,
+        df = df,
+        parameterbounds = parameterbounds,
+        δ=δ,
+        δmin=δmin,
+        δmax=δmax,
+        MaxNumberofSteps = MaxNumberofSteps,
+        con_par = con_par)
+    push!(psol_branch.points, psol_corrected)
+    push!(psol_branch.tangents, V_new)
+    push!(psol_branch.stepsizes, 0.0)
+    psol_branch
+end
+
+# branch off near psol to psol with double period
+function SetupPsolBranch(jet, con_par, psol1::psol_pd, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, ntst = 20, ncol = 3)
+
+    dims = length(psol1.profile[1])
+    ncol = psol1.ncol
+    ntst = convert(Int,(length(psol1.profile)-1)/ncol)
+
+    # define fine mesh
+    # compute eigenvector
+    jac = defsystem_psol_jac_no_mod(jet,psol1,τs)
+    s1,s2=size(jac)
+    n_ext=s2-s1
+    n2_ext=max(n_ext-s1,0)
+    B=blockdiag(sparse(1.0I, n2_ext, n2_ext),sparse(jac[1:s1,n_ext+1:s2]))
+    Atop=[spzeros(n2_ext,s1) sparse(1.0I, n2_ext, n2_ext)]
+    A=[Atop[:,1:n_ext];-jac[1:s1,1:n_ext]]
+    Ptau=[spzeros(n_ext,max(0,2*s1-s2)) sparse(1.0I, n_ext, n_ext)]
+
+    M = B\Matrix(A*sparse(1.0I, n_ext, n_ext))
+    vals,vecs = eigen(Ptau*M)
+    indx = last(findmin(abs.(vals) .+ 1))
+
+    MPfun(x) = vcat(x,(B[end-s1+1:end,:]\(A*x)))
+    x = real(MPfun(vecs[:,indx]))
+    [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))]
+
+    deviation=[c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))]
+    deviation2=[deviation;-deviation[2:end]]
+    deviation2=deviation2/first(findmax(abs.(vcat(deviation2...))))
+
+    # create periodic solution with with double period
+    new_profile = [psol1.profile; psol1.profile[2:end]] .+ 0.001deviation2
+    new_mesh = [psol1.mesh; psol1.mesh[2:end] .+ 1.0] ./ 2
+    new_period = 2psol1.period
+
+    psol_guess = psol(
+        new_profile,
+        psol1.parameters,
+        new_mesh,
+        new_period,
+        psol1.ncol,
+        nothing,
+        nothing)
+
+    f = (x,psol1) -> vcat([
+        psol_res(jet,
+            psol([reshape(x[1:end-2],2,:)[:,j] for j in 1:length(psol1.mesh)],
+            [psol1.parameters[1:con_par-1]; x[end-1]; psol1.parameters[con_par+1:end]], psol1.mesh, x[end], 
+                psol1.ncol, nothing, nothing),psol1,τs)...; 0.0] ...)
+
+    df = (x,psol1) -> defsystem_psol_jac(jet,
+            psol([reshape(x[1:end-2],2,:)[:,j] for j in 1:length(psol1.mesh)],
+            [psol1.parameters[1:con_par-1]; x[end-1]; psol1.parameters[con_par+1:end]], psol1.mesh, x[end], 
+                psol1.ncol, nothing, nothing),psol1,τs)
+
+    x₀ = vec(psol_guess,con_par)
+    jac = df(x₀,psol_guess)
+    V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
+    x₀new, _, V_new = newton(f, df, x₀, V, psol_guess; tol=1e-8)
+    psol_corrected = vec_to_point(x₀new,psol_guess,con_par)
+
+    # continuation with own newton
+    psol_branch = (points = psol[],
+        tangents = [],
+        stepsizes = [],
+        f = f,
+        df = df,
+        parameterbounds = parameterbounds,
+        δ=δ,
+        δmin=δmin,
+        δmax=δmax,
+        MaxNumberofSteps = MaxNumberofSteps,
+        con_par = con_par)
+    push!(psol_branch.points, psol_corrected)
+    push!(psol_branch.tangents, V_new)
+    push!(psol_branch.stepsizes, 0.0)
+    psol_branch
 end
 
 function psol_res(jet,periodicsolution,psol_ref,τs)
@@ -79,117 +215,12 @@ function *(δ,p::psol)
     )
 end 
 
-function +(p1::psol_fold,p2::psol_fold)
-    psol_fold(
-         p1.profile .+ p2.profile,
-         p1.eigenvector .+ p2.eigenvector,
-         p1.parameters + p2.parameters,
-         p2.mesh,
-         p1.period + p2.period,
-         p2.ncol,
-         nothing,
-         nothing,
-         p1.beta + p2.beta
-    )
-end
-
-function -(p1::psol_fold,p2::psol_fold)
-    psol_fold(
-         p1.profile .-p2.profile,
-         p1.eigenvector .- p2.eigenvector,
-         p1.parameters - p2.parameters,
-         p2.mesh,
-         p1.period - p2.period,
-         p2.ncol,
-         nothing,
-         nothing,
-         p1.beta - p2.beta
-    )
-end
-
-function *(δ,p::psol_fold)
-    psol_fold(
-         δ*p.profile,
-         δ*p.eigenvector,
-         δ*p.parameters,
-         p.mesh,
-         δ*p.period,
-         p.ncol,
-         nothing,
-         nothing,
-         δ*p.beta
-    )
-end 
-
 function remesh_psol(psol1, new_mesh, new_ncol)
     γ = psol1.profile
     ncol = psol1.ncol
     ts = psol1.mesh 
     γ_new = [[γ[1]]; interpolate.(new_mesh[2:end-1],0.0,Ref(γ),Ref(ts),ncol); [γ[end]]]
     psol(γ_new, psol1.parameters, collect(new_mesh), psol1.period, new_ncol, nothing, nothing)
-end
-
-function fold_q1_approx(jet,fold_guess,τs)
-    γ = fold_guess.profile
-    dims = length(γ[1])
-    ncol = fold_guess.ncol
-    ntst = convert(Int,(length(γ)-1)/ncol)
-
-    T = fold_guess.period
-    ts = fold_guess.mesh
-    testintervals = fold_guess.mesh[1:ncol:end]
-    par = fold_guess.parameters
-    nodes,weights = legendre(ncol)
-    colpoints = hcat([ts[i*ncol+1] .+ (ts[(i+1)*ncol+1] - ts[i*ncol+1])/2 .* (nodes .+ 1) for i in 0:ntst-1]...)
-
-    ϕ₀(τ,θ) =   interpolate(τ,θ,γ,ts,ncol)
-    dγ(τ,θ) = d_interpolate(τ,θ,γ,ts,ncol)
-
-    RHS = dγ.(colpoints[:],0.0)/T + [jet.D1(hcat(ϕ₀.(ζ,-τs/T)...),par)*vcat([τ*dγ(ζ,-τ/T) for τ in τs]...) for ζ in colpoints[:]]/T
-    Bex = [vcat(RHS...); zeros(dims+1)]
-    jac = defsystem_psol_jac(jet,fold_guess,fold_guess,τs)
-    q1,_ = borderedInverse(jac[1:end-1,1:end-2],-Bex,ntst,ncol,dims,ts,normalization=true);
-    q1
-end 
-
-function fold_tangent(jet,fold_guess,τs)
-    # jac = defsystem_psol_jac(jet,fold_guess,fold_guess,τs)
-    # v = qr(jac[1:end,1:end .!= end-1]').Q[:,end-1]
-    q₁ = fold_q1_approx(jet,fold_guess,τs)
-    β = 1.0
-    v  = [q₁...; β]
-
-    γ = fold_guess.profile
-    ncol = fold_guess.ncol
-    ts = fold_guess.mesh
-
-    ntst = convert(Int,(length(γ)-1)/ncol)
-    nodes,weights = legendre(ncol)
-    colpoints = hcat([ts[i*ncol+1] .+ (ts[(i+1)*ncol+1] - ts[i*ncol+1])/2 .* (nodes .+ 1) for i in 0:ntst-1]...)
-
-    # q₁ = [reshape(v[1:dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1]
-    # β = v[end]
-
-    testintervals = ts[1:ncol:end]
-    wi = repeat(testintervals[2:end] - testintervals[1:end-1],1,ncol)'[:]
-    q₁ζ =   interpolate.(colpoints[:],0.0,Ref(q₁),Ref(ts),ncol)
-    vβnorm =  sum(wi .* repeat(weights,ntst) .* dot.(q₁ζ,q₁ζ))/2 + β^2
-    v /= sqrt(vβnorm)
-end 
-
-function borderedInverse(jac,rhs,ntst,ncol,dims,ts;normalization=true)
-    jacex = [jac[1:end-1,:] rand(typeof(first(jac)),dims*(ntst*ncol+1))
-             rand(typeof(first(jac)),1,dims*(ntst*ncol+1)) 0.0]
-    p1 = jacex'\[zeros(dims*(ntst*ncol+1)); 1.0]
-    if normalization
-        sol = [jac p1]\rhs
-    else
-        q1 = jacex\[zeros(dims*(ntst*ncol+1)); 1.0]
-        sol = [jac[1:end-1,:] p1[1:end-1]; q1[1:end-1]' 0.0]\rhs
-        # sol = jacex\rhs
-    end
-    sol = [vec(reshape(sol[dims*(i-1)+1:dims*i],dims,1)) for i ∈ eachindex(ts)]
-    sol, p1
 end
 
 function psol_fold_res(jet,q₁,periodicsolution,psol_ref,τs)
@@ -261,42 +292,6 @@ end
 #     vcat(partI,partII)
 # end
 
-function psol_fold_res_β(jet,q₁,β,periodicsolution,psol_ref,τs)
-    γ = periodicsolution.profile
-    T = periodicsolution.period
-    ncol = periodicsolution.ncol
-    ts = periodicsolution.mesh
-    parameters = periodicsolution.parameters
-
-    ntst = convert(Int,(length(γ)-1)/ncol)
-    nodes,weights = legendre(ncol)
-    colpoints = hcat([ts[i*ncol+1] .+ (ts[(i+1)*ncol+1] - ts[i*ncol+1])/2 .* (nodes .+ 1) for i in 0:ntst-1]...)
-
-     γζ  =   interpolate.(colpoints[:],0.0,Ref(γ),Ref(ts),ncol)
-     q₁ζ =   interpolate.(colpoints[:],0.0,Ref(q₁),Ref(ts),ncol)
-     dγ = d_interpolate.(colpoints[:],0.0,Ref(γ),Ref(ts),ncol)
-     dq₁ = d_interpolate.(colpoints[:],0.0,Ref(q₁),Ref(ts),ncol)
-    γζs = [hcat(interpolate.(ζ,-τs/T,Ref(γ),Ref(ts),ncol)...) for ζ ∈ colpoints[:]]
-
-    testintervals = ts[1:ncol:end]
-    wi = repeat(testintervals[2:end] - testintervals[1:end-1],1,ncol)'[:]
-    dγref = d_interpolate.(colpoints[:],0.0,Ref(psol_ref.profile),T,Ref(ts),ncol)
-    phaseconditionI =  sum(wi .* repeat(weights,ntst) .* dot.(γζ, dγref))/2
-    # phasecondition = sum(dot.(γζ,dγ))
-    partI = [vcat((vec.(dγ)/T - jet.system.(γζs, Ref(parameters))) ...); γ[1] - γ[end]; phaseconditionI ...]
-
-    ϕ₀(τ,θ) =   interpolate(τ,θ,γ,ts,ncol)
-    dϕ₀(τ,θ) = d_interpolate(τ,θ,γ,ts,ncol)
-    ϕ₁hat(τ) = interpolate(τ,0.0,q₁,ts,ncol)
-
-    phaseconditionII =  sum(wi .* repeat(weights,ntst) .* dot.(q₁ζ,dγref))/2
-    # phaseconditionII =  sum(wi .* repeat(weights,ntst) .* dot.(q₁ζ,dq₁))/2
-    phaseconditionIII =  sum(wi .* repeat(weights,ntst) .* dot.(q₁ζ,q₁ζ))/2 + β^2 - 1.0
-    partII = [vcat(β*dγ/T + dq₁/T + [jet.D1(hcat(ϕ₀.(ζ,-τs/T)...),parameters)*vcat([β*τ*dϕ₀(ζ,-τ/T)/T - ϕ₁hat(ζ-τ/T) for τ in τs]...) for ζ in colpoints[:]] ...); 
-        q₁[1] - q₁[end]; phaseconditionII; phaseconditionIII ... ]
-    vcat(partI,partII)
-end
-
 function defsystem_psol_jac(jet,psol_guess,psol_ref,τs; conpar = 2, sign1=-)
     M = jet.M
 
@@ -355,178 +350,19 @@ function defsystem_psol_jac(jet,psol_guess,psol_ref,τs; conpar = 2, sign1=-)
     Jac
 end
 
-function defsystem_fold_jac(jet,fold_guess,fold_ref,τs)
+function detectSpecialPoints(branch)
+    # detect NS bifurcations
+    num_unstable = [sum(abs.(p.stability) .> 1.0) for p in branch.points]
+    indx_ns = findall(x->x==2,num_unstable[2:end] - num_unstable[1:end-1])
 
-    M = jet.M
+    # detect fold bifurcations
+    num_unstable = [sum(abs.(p.stability) .> 1.0 .&& real(p.stability) .> 0.0) for p in branch.points]
+    indx_fold = findall(x->abs(x)==1,num_unstable[2:end] - num_unstable[1:end-1])
 
-    γ = fold_guess.profile
-    # γref = fold_ref.profile
-    q₁ = fold_guess.eigenvector
-    β  = fold_guess.beta
-    dims = length(fold_guess.profile[1])
-    ncol = fold_guess.ncol
-    ntst = convert(Int,(length(γ)-1)/ncol)
+    # detect pd bifurcations
+    num_unstable = [sum(abs.(p.stability) .> 1.0 .&& real(p.stability) .< 0.0) for p in branch.points]
+    indx_pd = findall(x->abs(x)==1,num_unstable[2:end] - num_unstable[1:end-1])
 
-    nodes, weights = legendre(ncol)
-    ts = fold_guess.mesh
-    colpoints = hcat([ts[i*ncol+1] .+ (ts[(i+1)*ncol+1] - ts[i*ncol+1])/2 .* (nodes .+ 1) for i in 0:ntst-1]...)
-    par = fold_guess.parameters
-    T = fold_guess.period
-    testintervals = fold_guess.mesh[1:ncol:end]
-
-    dγ = d_interpolate.(colpoints[:],0.0,Ref(γ),Ref(ts),ncol)
-
-    jacI = defsystem_psol_jac(jet,fold_guess,fold_guess,τs,conpar = [1,2])
-
-    jac_sym = zeros(2*dims*(ntst*ncol+1)+4,2*dims*(ntst*ncol+1)+4)
-    # derivative partI wrt γ + boundary condition + phase condition
-    jac_sym[1:dims*(ntst*ncol+1)+1,1:dims*(ntst*ncol+1)] = jacI[1:dims*(ntst*ncol+1)+1,1:dims*(ntst*ncol+1)]
-    # derivative partI wrt parameters and period
-    jac_sym[1:dims*(ntst*ncol+1)+1,end-3:end-1] = jacI[1:dims*(ntst*ncol+1)+1,end-2:end]
-    # derivative partII wrt q₁ + boundary condition + phaseconditionII
-    jac_sym[dims*(ntst*ncol+1)+2:end-2,dims*(ntst*ncol+1)+1:end-4] = jacI[1:end-1,1:end-3]
-
-    ϕ₀(τ,θ) =   interpolate(τ,θ,γ,ts,ncol)
-    dϕ₀(τ,θ) = d_interpolate(τ,θ,γ,ts,ncol)
-    ϕ₁hat(τ) = interpolate(τ,0.0,q₁,ts,ncol)
-
-    # derivative partII wrt β
-    jac_sym[dims*(ntst*ncol+1)+2:end-dims-3,end] = vcat(dγ/T + [jet.D1(hcat(ϕ₀.(ζ,-τs/T)...),par)*vcat([τ*dϕ₀(ζ,-τ/T)/T for τ in τs]...) for ζ in colpoints[:]] ...)
-    jac_sym[end-1,end] = 2*fold_guess.beta
-
-    for (i,τ) = enumerate(colpoints)
-        ζs = mod.(τ .- τs/T, 1.0) 
-        intervals = searchsortedfirst.(Ref(testintervals), ζs) .- 1
-
-        xs = [ts[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        γζ =   [ γ[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        q₁ζ = [ q₁[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        u =    [L(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,γζ)]
-        du =  [dL(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,γζ)]
-        ddu =  [ddL(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,γζ)]
-        q₁ζs = [L(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,q₁ζ)]
-        dq₁ζs = [dL(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,q₁ζ)]
-
-        dMj = jet.D2v1(hcat(u ...),par, vcat(β/T*τs.*du - q₁ζs  ...))
-        # dMj = jet.D2v1(hcat(ϕ₀.(τ,-τs/T)...),par, vcat([β*τj*dϕ₀(τ,-τj/T)/T - ϕ₁hat(τ-τj/T) for τj in τs] ...))
-        # dMj = zeros(dims,dims*length(τs))
-
-        for k=0:ncol
-            jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),ncol*dims*(intervals[1]-1) .+ range(k*dims+1,(k+1)*dims)] += β/T*dlj(xs[1],ζs[1],k,ncol)*diagm(ones(dims)) + dMj[:,1:dims]*l0(xs[1],ζs[1],k,ncol)*diagm(ones(dims)) 
-        end
-        # # delay terms
-        for j ∈ 2:length(τs)
-            for k=0:ncol
-                jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),ncol*dims*(intervals[j]-1) .+ range(k*dims+1,(k+1)*dims)] += β/T*τs[j]*M[j](hcat(u...),par)*dlj(xs[j],ζs[j],k,ncol)*diagm(ones(dims)) + dMj[:,(j-1)*dims+1:j*dims]*l0(xs[j],ζs[j],k,ncol)*diagm(ones(dims))
-                # jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),ncol*dims*(intervals[j]-1) .+ range(k*dims+1,(k+1)*dims)] += dMj[:,(j-1)*dims+1:j*dims]*l0(xs[j],ζs[j],k,ncol)*diagm(ones(dims))
-            end
-        end
-
-        # phase condition III
-        ti = xs[1][end] - xs[1][begin]
-        for k=0:ncol
-            jac_sym[end-1,dims*(ntst*ncol+1) + ncol*dims*(intervals[1]-1) .+ range(k*dims+1,(k+1)*dims)] += ti*weights[mod(i-1,ncol) + 1]*L(xs[1],q₁ζ[1],ζs[1],ncol)*l0(xs[1],ζs[1],k,ncol)
-        end
-
-        # derivative with respect to parameters of partII
-        jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims), end-3:end-2] = jet.D11v1(hcat(u ...),par, vcat(β/T*τs.*du - q₁ζs  ...))
-
-        # derivative with respect to period of partII
-        jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),end-1] = -β/T^2*dL(xs[1],γζ[1],ζs[1],ncol) - 1/T^2*dL(xs[1],q₁ζ[1],ζs[1],ncol)
-        # delay terms
-        for j ∈ 2:length(τs)
-            jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),end-1] += 1/T^2*τs[j]*dMj[:,(j-1)*dims+1:j*dims]*dL(xs[j],γζ[j],ζs[j],ncol) + M[j](hcat(u...),par)*( β*τs[j]*((-1/T^2)*du[j] + τs[j]/T^2*ddu[j]/T) - τs[j]/T^2*dq₁ζs[j])
-        end
-
-    end
-
-    jac_sym
-end
-
-function defsystem_fold_jac_β(jet,fold_guess,fold_ref,τs)
-
-    M = jet.M
-
-    γ = fold_guess.profile
-    # γref = fold_ref.profile
-    q₁ = fold_guess.eigenvector
-    β  = fold_guess.beta
-    dims = length(fold_guess.profile[1])
-    ncol = fold_guess.ncol
-    ntst = convert(Int,(length(γ)-1)/ncol)
-
-    nodes, weights = legendre(ncol)
-    ts = fold_guess.mesh
-    colpoints = hcat([ts[i*ncol+1] .+ (ts[(i+1)*ncol+1] - ts[i*ncol+1])/2 .* (nodes .+ 1) for i in 0:ntst-1]...)
-    par = fold_guess.parameters
-    T = fold_guess.period
-    testintervals = fold_guess.mesh[1:ncol:end]
-
-    dγ = d_interpolate.(colpoints[:],0.0,Ref(γ),Ref(ts),ncol)
-
-    jacI = defsystem_psol_jac(jet,fold_guess,fold_guess,τs,conpar = [1,2])
-
-    jac_sym = zeros(2*dims*(ntst*ncol+1)+4,2*dims*(ntst*ncol+1)+4)
-    # derivative partI wrt γ + boundary condition + phase condition
-    jac_sym[1:dims*(ntst*ncol+1)+1,1:dims*(ntst*ncol+1)] = jacI[1:dims*(ntst*ncol+1)+1,1:dims*(ntst*ncol+1)]
-    # derivative partI wrt parameters and period
-    jac_sym[1:dims*(ntst*ncol+1)+1,end-3:end-1] = jacI[1:dims*(ntst*ncol+1)+1,end-2:end]
-    # derivative partII wrt q₁ + boundary condition + phaseconditionII
-    jac_sym[dims*(ntst*ncol+1)+2:end-2,dims*(ntst*ncol+1)+1:end-4] = jacI[1:end-1,1:end-3]
-
-    ϕ₀(τ,θ) =   interpolate(τ,θ,γ,ts,ncol)
-    dϕ₀(τ,θ) = d_interpolate(τ,θ,γ,ts,ncol)
-    ϕ₁hat(τ) = interpolate(τ,0.0,q₁,ts,ncol)
-
-    # derivative partII wrt β
-    jac_sym[dims*(ntst*ncol+1)+2:end-dims-3,end] = vcat(dγ/T + [jet.D1(hcat(ϕ₀.(ζ,-τs/T)...),par)*vcat([τ*dϕ₀(ζ,-τ/T)/T for τ in τs]...) for ζ in colpoints[:]] ...)
-    jac_sym[end-1,end] = 2*fold_guess.beta
-
-    for (i,τ) = enumerate(colpoints)
-        ζs = mod.(τ .- τs/T, 1.0) 
-        intervals = searchsortedfirst.(Ref(testintervals), ζs) .- 1
-
-        xs = [ts[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        γζ =   [ γ[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        q₁ζ = [ q₁[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        u =    [L(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,γζ)]
-        du =  [dL(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,γζ)]
-        ddu =  [ddL(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,γζ)]
-        q₁ζs = [L(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,q₁ζ)]
-        dq₁ζs = [dL(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,q₁ζ)]
-
-        dMj = jet.D2v1(hcat(u ...),par, vcat(β/T*τs.*du - q₁ζs  ...))
-        # dMj = jet.D2v1(hcat(ϕ₀.(τ,-τs/T)...),par, vcat([β*τj*dϕ₀(τ,-τj/T)/T - ϕ₁hat(τ-τj/T) for τj in τs] ...))
-        # dMj = zeros(dims,dims*length(τs))
-
-        for k=0:ncol
-            jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),ncol*dims*(intervals[1]-1) .+ range(k*dims+1,(k+1)*dims)] += β/T*dlj(xs[1],ζs[1],k,ncol)*diagm(ones(dims)) + dMj[:,1:dims]*l0(xs[1],ζs[1],k,ncol)*diagm(ones(dims)) 
-        end
-        # # delay terms
-        for j ∈ 2:length(τs)
-            for k=0:ncol
-                jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),ncol*dims*(intervals[j]-1) .+ range(k*dims+1,(k+1)*dims)] += β/T*τs[j]*M[j](hcat(u...),par)*dlj(xs[j],ζs[j],k,ncol)*diagm(ones(dims)) + dMj[:,(j-1)*dims+1:j*dims]*l0(xs[j],ζs[j],k,ncol)*diagm(ones(dims))
-                # jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),ncol*dims*(intervals[j]-1) .+ range(k*dims+1,(k+1)*dims)] += dMj[:,(j-1)*dims+1:j*dims]*l0(xs[j],ζs[j],k,ncol)*diagm(ones(dims))
-            end
-        end
-
-        # phase condition III
-        ti = xs[1][end] - xs[1][begin]
-        for k=0:ncol
-            jac_sym[end-1,dims*(ntst*ncol+1) + ncol*dims*(intervals[1]-1) .+ range(k*dims+1,(k+1)*dims)] += ti*weights[mod(i-1,ncol) + 1]*L(xs[1],q₁ζ[1],ζs[1],ncol)*l0(xs[1],ζs[1],k,ncol)
-        end
-
-        # derivative with respect to parameters of partII
-        jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims), end-3:end-2] = jet.D11v1(hcat(u ...),par, vcat(β/T*τs.*du - q₁ζs  ...))
-
-        # derivative with respect to period of partII
-        jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),end-1] = -β/T^2*dL(xs[1],γζ[1],ζs[1],ncol) - 1/T^2*dL(xs[1],q₁ζ[1],ζs[1],ncol)
-        # delay terms
-        for j ∈ 2:length(τs)
-            jac_sym[dims*(ntst*ncol+1)+1 .+ range((i-1)*dims+1,i*dims),end-1] += 1/T^2*τs[j]*dMj[:,(j-1)*dims+1:j*dims]*dL(xs[j],γζ[j],ζs[j],ncol) + M[j](hcat(u...),par)*( β*τs[j]*((-1/T^2)*du[j] + τs[j]/T^2*ddu[j]/T) - τs[j]/T^2*dq₁ζs[j])
-        end
-
-    end
-
-    jac_sym
+    specialpoints = (indx_fold = indx_fold, indx_pd  = indx_pd, indx_ns = indx_ns)
+    merge(branch, (specialpoints = specialpoints,))
 end

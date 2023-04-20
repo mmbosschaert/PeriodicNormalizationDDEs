@@ -1,16 +1,5 @@
-struct psol_pd{T}
-    profile::Vector{Vector{T}}
-    eigenvector::Vector{Vector{T}}
-    parameters::Vector{T}
-    mesh::Vector{Float64}
-    period::T
-    ncol::Int
-    stability::Union{Vector{ComplexF64},Nothing}
-    nmfm::Union{ComplexF64,Nothing}
-end
-
 function psol_to_pd(pd_guess)
-    # construct ns struct
+    # construct pd struct
     psol_pd(pd_guess.profile,
         [[0.0]],
         pd_guess.parameters,
@@ -18,7 +7,8 @@ function psol_to_pd(pd_guess)
         pd_guess.period,
         pd_guess.ncol,
         pd_guess.stability,
-        nothing)
+        nothing,
+        convert(Float64,π))
 end
 
 function pd_q1_approx(jet,pd_guess,τs)
@@ -353,4 +343,99 @@ function pd_res_jac(jet,periodicsolution,periodicsolution_res,τs)
     jac[dims*(ntst*ncol+1) + 1 .+ range(2*dims*ntst*ncol+1,2*dims*(ntst*ncol+1)),end-2*dims+1-3:end-3] = -diagm(ones(2*dims))
 
     jac
+end
+
+function vec(p::psol_pd,_)
+    [vcat(p.profile...); vcat(p.eigenvector...); p.parameters; p.period; p.omega]
+end
+
+function vec_to_point(v,p_prev::psol_pd,_)
+    dims = length(p_prev.profile[1])
+    ncol = p_prev.ncol
+    ntst = convert(Int,(length(p_prev.profile)-1)/ncol)
+    psol_pd(
+            [c[:] for c in eachcol(reshape(v[1:dims*(ntst*ncol+1)],dims,:))],
+            [c[:] for c in eachcol(reshape(v[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+            v[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+            p_prev.mesh, 
+            v[3*dims*(ntst*ncol+1)+3],
+            p_prev.ncol, 
+            p_prev.stability,
+            p_prev.nmfm,
+            v[3*dims*(ntst*ncol+1)+4])
+end
+
+function SetupPDBranch(jet,pd_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250)
+
+    pd_guess = psol_to_pd(pd_guess)
+    pd_guess = ns_w_approx(jet,pd_guess,τs);
+
+    x₀ = vec(pd_guess,nothing)
+
+    #v = ns_tangent(jet,ns_guess,τs);
+    #x₀ = [vcat(ns_guess.profile...); v[1:end-1]; ns_guess.parameters; ns_guess.period; v[end] ...]
+
+    dims = length(pd_guess.profile[1])
+    ncol = pd_guess.ncol
+    ntst = convert(Int,(length(pd_guess.profile)-1)/ncol)
+
+    f = (x,p_prev) -> vcat(
+        [psol_ns_res(jet,
+                psol_ns(
+                    [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                    [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                    x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                    p_prev.mesh, 
+                    x[3*dims*(ntst*ncol+1)+3],
+                    p_prev.ncol, 
+                    p_prev.stability,
+                    p_prev.nmfm,
+                    x[3*dims*(ntst*ncol+1)+4]),
+                p_prev,
+                τs); 0.0] ...)
+
+    df = (x,p_prev) -> ns_res_jac(jet,
+                        psol_ns(
+                            [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                            [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                            x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                            p_prev.mesh, 
+                            x[3*dims*(ntst*ncol+1)+3],
+                            p_prev.ncol, 
+                            p_prev.stability,
+                            p_prev.nmfm,
+                            x[3*dims*(ntst*ncol+1)+4]),
+        p_prev,τs)
+
+    # solve with own newton
+    jac = df(x₀,pd_guess)
+    V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
+    x₀new, _, V_new = newton(f, df, x₀, V, pd_guess; tol=1e-8)
+
+    # convert ns_guess to psol_ns
+    pd_corrected = vec_to_point(x₀new, pd_guess, nothing)
+
+    # continuation with own newton
+    pd_branch = (points = psol_pd[], tangents = [], stepsizes = [], 
+        f = f, df = df,
+        parameterbounds=parameterbounds,
+        δ=δ,
+        δmin=δmin,
+        δmax=δmax,
+        MaxNumberofSteps = MaxNumberofSteps,
+        con_par = nothing 
+    )
+
+    push!(pd_branch.points, pd_corrected)
+    push!(pd_branch.tangents, V_new)
+    push!(pd_branch.stepsizes, 0.0)
+    pd_branch
+end
+
+function LocateGPDPoints(branch)
+    pd_coeffs = [p.nmfm for p in branch.points]
+    pd_sign_change = findall(c -> c != 0.0,(pd_coeffs .> 0.0)[2:end] - (pd_coeffs .> 0.0)[1:end-1])
+    gpd_indx = pd_sign_change
+    specialpoints = (gpd_indx = gpd_indx,)
+    merge(branch, (specialpoints = specialpoints,))
 end

@@ -145,6 +145,33 @@ function d_interpolate(τ,θ,y,T,ts,ncol)
         vec(dL(x,ys,ζ,ncol))
 end
 
+function interpolateT(τ,θ,y,T,ts,ncol)
+        ζ = mod1(τ + θ,T)
+        testintervals = ts[1:ncol:end]
+        interval = searchsortedfirst(testintervals, ζ) .- 1
+        x = ts[1+(interval-1)*ncol:1+interval*ncol]
+        ys = y[1+(interval-1)*ncol:1+interval*ncol] 
+        L(x,ys,ζ,ncol)
+end
+
+function d_interpolateT(τ,θ,y,T,ts,ncol)
+        ζ = mod1(τ + θ,T)
+        testintervals = ts[1:ncol:end]
+        interval = searchsortedfirst(testintervals, ζ) .- 1
+        x = ts[1+(interval-1)*ncol:1+interval*ncol]
+        ys = y[1+(interval-1)*ncol:1+interval*ncol] 
+        vec(dL(x,ys,ζ,ncol))
+end
+
+function dd_interpolateT(τ,θ,y,T,ts,ncol)
+        ζ = mod1(τ + θ,T)
+        testintervals = ts[1:ncol:end]
+        interval = searchsortedfirst(testintervals, ζ) .- 1
+        x = ts[1+(interval-1)*ncol:1+interval*ncol]
+        ys = y[1+(interval-1)*ncol:1+interval*ncol] 
+        vec(ddL(x,ys,ζ,ncol))
+end
+
 # @register_symbolic searchsortedfirst(testintervals::Vector{Float64}, ζ)
 
 # @register_symbolic   interpolate(τ::Float64,θ::Float64,y,T,ts::Vector{Float64},ncol::Int)
