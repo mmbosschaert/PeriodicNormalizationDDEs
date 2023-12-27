@@ -14,7 +14,7 @@ end
 #         parameterbounds = branch.parameterbounds)
 # end
 
-function continue!(branch,f,df,point_to_vec,vec_to_point,V;δ=1,MaxNumberofSteps=250,δmin=0.001,δmax=1.2, parameterbounds = nothing)
+function continue!(branch,f,df,point_to_vec,vec_to_point,V;δ=1,MaxNumberofSteps=250,δmin=0.001,δmax=1.2, parameterbounds = nothing, NumberOfFails = 4)
 
     iterations=0
     fails=0
@@ -30,7 +30,7 @@ function continue!(branch,f,df,point_to_vec,vec_to_point,V;δ=1,MaxNumberofSteps
         if ~converged
             println("No convergence")
             fails += 1
-            if fails < 4
+            if fails < NumberOfFails
                 δ /= 0.5
                 continue
             else
@@ -90,6 +90,7 @@ function continue!(branch)
     δmax=branch.δmax
     parameterbounds = branch.parameterbounds
     con_par = branch.con_par
+    NumberOfFails = branch.NumberOfFails
 
     fails = 0
 
@@ -114,7 +115,7 @@ function continue!(branch)
         if ~converged
             println("No convergence")
             fails += 1
-            if fails < 4
+            if fails < NumberOfFails
                 δ /= 2.0
                 # branch = @set branch.points = branch.points[1:end-1] # remove last point
                 continue

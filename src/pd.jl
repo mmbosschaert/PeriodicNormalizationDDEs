@@ -365,7 +365,8 @@ function vec_to_point(v,p_prev::psol_pd,_)
             v[3*dims*(ntst*ncol+1)+4])
 end
 
-function SetupPDBranch(jet,pd_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250)
+function SetupPDBranch(jet,pd_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, 
+            NumberOfFails = 4) 
 
     pd_guess = psol_to_pd(pd_guess)
     pd_guess = ns_w_approx(jet,pd_guess,τs);
@@ -423,7 +424,8 @@ function SetupPDBranch(jet,pd_guess,τs; parameterbounds=nothing, δ=.001, δmin
         δmin=δmin,
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
-        con_par = nothing 
+        con_par = nothing,
+        NumberOfFails = NumberOfFails
     )
 
     push!(pd_branch.points, pd_corrected)

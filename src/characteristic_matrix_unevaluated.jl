@@ -39,6 +39,7 @@ function characteristic_matrices_unevaluated_re_im(model, n, τs)
         Δre -= Mⱼ*cos(z*τs[j])
         Δim += Mⱼ*sin(z*τs[j])
     end 
+
     Δre = build_function(Δre, φ, pars, z, expression=Val{false})[1]
     Δim = build_function(Δim, φ, pars, z, expression=Val{false})[1]
 

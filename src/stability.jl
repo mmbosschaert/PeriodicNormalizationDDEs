@@ -1,3 +1,4 @@
+# remove this function
 function stability(M,points,τs; neigs = 13, maxit = 100)
     for (i,p) in enumerate(points)
         dep = DEP(M(repeat(p.coords,1,length(τs)),p.parameters), vec(τs))
@@ -10,4 +11,10 @@ function stability(jet::NamedTuple,p,τs; neigs = 13, maxit = 100)
     dep = DEP(jet.Ms(repeat(p.coords,1,length(τs)),p.parameters), vec(τs))
     λ,_ = iar_chebyshev(dep,maxit=maxit,neigs=neigs)
     @set p.stability = λ
+end
+
+function stability(jet::NamedTuple, branch::NamedTuple, τs; neigs=13, maxit=100)
+    for (i,p) in enumerate(branch.points)
+        branch.points[i] = stability(jet,p,τs; neigs = neigs, maxit = maxit) 
+    end
 end

@@ -5,6 +5,8 @@ import Base.*
 import Base.+
 import Base.-
 
+# overload the NaNMath.cos function to allow for symbolic Num
+# used in build_function in  characteristic_matrix_unevaluated.jl
 export characteristic_matrices, getJet, eigenfunctionsBT, BTnormalformcoefficients
 export coefficient_matrices, characteristic_matrices_unevaluated
 export characteristic_matrices_unevaluated_re_im
@@ -15,17 +17,17 @@ export stst
 export vec
 export locate_double_hopf
 export locate_zero_hopf
-export locate_genh
+export detect_genh
 export normalform
 export psol
-export psol_fold
+export PsolLPC
 export psol_res
 export dL
 export -, *
 export defsystem_psol_jac
 export defsystem_fold_jac_β
-export psol_fold_res
-export psol_fold_res_β
+export psolLPC_res
+export psolLPC_res_β
 export interpolate
 export d_interpolate
 export fold_q1_approx
@@ -49,7 +51,6 @@ export psol_to_pd
 export psol_pd_res_as_ns
 export pd_res_jac
 export continue!
-export monodromy_matrix
 export SetupStstBranch
 export LocateHopfPoints
 export SetupHopfBranch
@@ -63,8 +64,14 @@ export SetupNSBranch
 export nmfm_coefficient
 export SetupPDBranch
 export LocateGPDPoints
-export piont_to_hoho
+export point_to_hoho
 export hopf_from_hoho
+export get_params
+export get_nmfm_coefficients
+export point_to_genhopf
+export locate_genh
+export +, *
+export doubleHopfToPsol
 
 using LinearAlgebra
 using Symbolics
@@ -74,6 +81,10 @@ using GaussQuadrature
 using NLsolve
 using Setfield
 using SparseArrays
+using NaNMath
+NaNMath.cos(x::Num) = cos(x)
+NaNMath.sin(x::Num) = sin(x)
+
 
 include("./characteristic_matrix.jl")
 include("./characteristic_matrix_unevaluated.jl")
@@ -90,7 +101,7 @@ include("./stability.jl")
 include("./doubleHopf.jl")
 include("./zeroHopf.jl")
 include("./psol.jl")
-include("./fold.jl")
+include("./lpc.jl")
 include("./ns.jl")
 include("./multipliers.jl")
 include("./interpolation.jl")
@@ -99,5 +110,12 @@ include("./borderedInverse.jl")
 include("./coefficients.jl")
 include("./multilinear_forms.jl")
 include("./NewtonCotesWeights.jl")
+include("./generalizedHopf.jl")
+
+# Auxiliary functions
+# auxiliary function to extract parameters
+get_params(points) = hcat([p.parameters for p in points]...)
+# auxiliary function to extract normal form coefficients
+get_nmfm_coefficients(branch) = [p.nmfm for p in branch.points]
 
 end # module

@@ -469,8 +469,45 @@ function vec_to_point(v,p_prev::psol_ns,_)
             v[3*dims*(ntst*ncol+1)+4])
 end
 
+# fucntion to create initial guess for Neimark-Sacker branches from double Hopf point
+function doubleHopfToPsol(jet, hoho, ϵ₁, ϵ₂, ntst, ncol, τs)
+    # extract normal form coefficients
+    q = hoho.nmfm.q
+    g1110 = hoho.nmfm.g1110
+    g1011 = hoho.nmfm.g1011
+    g2100 = hoho.nmfm.g2100
+    g0021 = hoho.nmfm.g0021
+    h000001 = hoho.nmfm.h0000[1](0)
+    h000010 = hoho.nmfm.h0000[2](0)
+    h1100 = real(hoho.nmfm.h1100(0))
+    h0011 = real(hoho.nmfm.h0011(0))
+    h2000 = hoho.nmfm.h2000(0)
+    h0020 = real(hoho.nmfm.h0020(0))
+    b = hoho.nmfm.b
 
-function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250)
+    t = range(0.0,1.0, ntst*ncol + 1) # time mesh
+    β₁, β₂ = -real(g2100), -real(g1110)
+    profile = [2*real(exp(2*pi*t*im)*q[1])*ϵ₁ + (β₁*h000010 + β₂*h000001 + h1100 + real(exp(4*pi*t*im)*h2000))*ϵ₁^2 for t ∈ t]
+    pars = hoho.parameters + hoho.nmfm.K*[β₁; β₂]*ϵ₁^2
+    T = 2pi/(abs(hoho.ω₁) + b[1,1]*β₁ + b[1,2]*β₂ + imag(g2100)*ϵ₁^2)
+    # T = 2pi/abs(hoho.ω₁)
+    psol_guess1 = psol(profile, pars, collect(t), T, ncol, nothing, nothing)
+    psol_guess1 = multipliers(jet, psol_guess1, τs)
+
+    # approximate second NS branch 
+    β₁, β₂ = -real(g1011), -real(g0021)
+    profile = [2*real(exp(2*pi*t*im)*q[2])*ϵ₂ + (β₁*h000010 + β₂*h000001 + h0011 + real(exp(4*pi*t*im)*h0020))*ϵ₂^2 for t ∈ t]
+    pars = hoho.parameters + hoho.nmfm.K*[β₁; β₂]*ϵ₂^2
+    T = 2pi/(abs(hoho.ω₂) + b[1,2]*β₁ + b[2,2]*β₂ + imag(g0021)*ϵ₂^2)
+    # T = 2pi/abs(hoho.ω₂)
+    psol_guess2 = psol(profile, pars, collect(t), T, ncol, nothing, nothing)
+    psol_guess2 = multipliers(jet, psol_guess2, τs)
+
+    psol_guess1, psol_guess2
+end
+
+function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250,
+    NumberOfFails = 4)
 
     ns_guess = psol_to_ns(ns_guess)
     ns_guess = ns_w_approx(jet,ns_guess,τs);
@@ -529,7 +566,8 @@ function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin
         δmin=δmin,
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
-        con_par = nothing 
+        con_par = nothing,
+        NumberOfFails = NumberOfFails
     )
 
     push!(ns_branch.points, ns_corrected)

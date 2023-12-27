@@ -21,7 +21,6 @@ function borderedInverse(jac,rhs,ntst,ncol,dims,ts;normalization=true)
     sol, p1
 end
 
-
 function leftnullvector(jac,ntst,ncol,dims)
     _, s, V = svd(jac[1:end-1,:]')
     indxmin = last(findmin(s))

@@ -1,4 +1,4 @@
-function nmfm_coefficient(jet,periodicsolution::psol_fold,τs,ap)
+function nmfm_coefficient(jet,periodicsolution::PsolLPC,τs,ap)
 
     T = periodicsolution.period
     par = periodicsolution.parameters[ap]
@@ -11,11 +11,6 @@ function nmfm_coefficient(jet,periodicsolution::psol_fold,τs,ap)
     ncol = periodicsolution.ncol
     ntst = convert(Int,(length(γ)-1)/ncol)
 
-    # ts = vcat(vec(ts),T .+ ts[2:end])
-    # γ =vcat(γ,γ[2:end])
-    # T *= 2
-    # ntst *=2
-
     nodes = first(legendre(ncol))
     colpoints = hcat([ts[i*ncol+1] .+ (ts[(i+1)*ncol+1] - ts[i*ncol+1])/2 .* (nodes .+ 1) for i in 0:ntst-1]...)
     testintervals = ts[1:ncol:end]
@@ -26,7 +21,6 @@ function nmfm_coefficient(jet,periodicsolution::psol_fold,τs,ap)
     dγ(τ,θ) = d_interpolateT(τ,θ,γ,T,ts,ncol)
 
     jac = differential_equation_part(M,γ,ts,par,τs,T,colpoints,dims,ntst,ncol,testintervals)
-    # jacII = defsystem_eigenfuction_fold_jac(M,γ,ts,par,τs,T,colpoints,dims,ntst,ncol,testintervals)
 
     q1, p1 = borderedInverse(jac,[-ζ(dγ); zeros(dims+1)],ntst,ncol,dims,ts,normalization=false)
     p1 = p1[1:end-2]
@@ -38,40 +32,8 @@ function nmfm_coefficient(jet,periodicsolution::psol_fold,τs,ap)
 
     # The following expression should vanishing
     # @show dot(p1, vcat(dγ.(colpoints[:],0) + sum(M[j+1].(γτs,Ref(par)) .* ( τ*dγ.(colpoints[:],-τ)) for (j,τ) ∈ enumerate(τs[2:end]))...))
-    #
+
     dot(p1,Bτ(γ_interpolate,φ,φ) - 2.0*ζ(dφ))/(2.0*dot(p1,ζ(φ2)))
-end
-
-function defsystem_eigenfuction_fold_jac(M,γ,ts,par,τs,T,colpoints,dims,ntst,ncol,testintervals)
-    Jac = zeros(dims*(ntst*ncol+1) + 1,dims*(ntst*ncol+1))
-    weights = last(legendre(ncol))
-    for (i,τ) = enumerate(colpoints)
-        ζs = mod1.(τ .- τs, T) 
-        intervals = searchsortedfirst.(Ref(testintervals), ζs) .- 1
-
-        xs = [ts[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        γζ = [ γ[1+(interval-1)*ncol:1+interval*ncol] for interval in intervals]
-        u = [L(x,y,ζ,ncol) for (ζ,x,y) in zip(ζs,xs,γζ)]
-
-        for k=0:ncol
-            Jac[(i-1)*dims+1:i*dims,ncol*dims*(intervals[1]-1) .+ range(k*dims+1,(k+1)*dims)] += dlj(xs[1],ζs[1],k,ncol)*diagm(ones(dims)) - M[1](hcat(u...), par)*l0(xs[1],ζs[1],k,ncol)*diagm(ones(dims)) 
-        end
-        # delay terms
-        for j ∈ 2:length(τs)
-            for k=0:ncol
-                Jac[(i-1)*dims+1:i*dims,ncol*dims*(intervals[j]-1) .+ range(k*dims+1,(k+1)*dims)] -= M[j](hcat(u...),par)*l0(xs[j],ζs[j],k,ncol)*diagm(ones(dims)) 
-            end
-        end
-        # phase condition
-        ti = xs[1][end] - xs[1][begin]
-        for k=0:ncol
-            Jac[end,ncol*dims*(intervals[1]-1) .+ range(k*dims+1,(k+1)*dims)] += 0.5*ti*weights[mod(i-1,ncol) + 1]*dL(xs[1],γζ[1],ζs[1],ncol)*l0(xs[1],ζs[1],k,ncol)
-        end
-    end
-    Jac[dims*ntst*ncol+1:dims*(ntst*ncol+1),1:dims] = diagm(ones(dims))
-    Jac[dims*ntst*ncol+1:dims*(ntst*ncol+1),end-dims+1:end] = -diagm(ones(dims))
-
-    Jac
 end
 
 function nmfm_coefficient(jet,periodicsolution::psol_ns,τs,ap)

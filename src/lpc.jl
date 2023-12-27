@@ -125,7 +125,7 @@ function SetupLPCBranch(jet,fold_guess,τs; parameterbounds=nothing, δ=.001, δ
     ntst = convert(Int,(length(fold_guess.profile)-1)/ncol)
 
     f = (x,psol1) -> vcat([
-            psolLPC_res_β(jet,
+            PsolLPC_res_β(jet,
                             [reshape(x[dims*(ntst*ncol+1)+1:2*dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
                             x[end],
                        psol([reshape(x[1:dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
@@ -143,7 +143,7 @@ function SetupLPCBranch(jet,fold_guess,τs; parameterbounds=nothing, δ=.001, δ
     V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
     x₀new, _, V_new = newton(f, df, x₀, V, fold_guess; tol=1e-8)
 
-    # convert fold_guess to psolLPC
+    # convert fold_guess to PsolLPC
     fold_guess = PsolLPC(
         fold_guess.profile,
         [c[:] for c in eachcol(reshape(v[1:end-1],dims,:))],
@@ -264,7 +264,7 @@ function defsystem_fold_jac(jet,fold_guess,fold_ref,τs)
     jac_sym
 end
 
-function psolLPC_res_β(jet,q₁,β,periodicsolution,psol_ref,τs)
+function PsolLPC_res_β(jet,q₁,β,periodicsolution,psol_ref,τs)
     γ = periodicsolution.profile
     T = periodicsolution.period
     ncol = periodicsolution.ncol

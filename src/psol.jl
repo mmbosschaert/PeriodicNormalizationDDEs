@@ -32,7 +32,7 @@ function vec_to_point(vec,point_prev::psol,con_par)
              point_prev.mesh, vec[end], point_prev.ncol, nothing, nothing)
 end
 
-function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, ntst = 20, ncol = 3)
+function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, ntst = 20, ncol = 3, NumberOfFails = 4)
 
     # define fine mesh
     t = range(0.0,1.0, ntst*ncol + 1)
@@ -70,7 +70,8 @@ function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=no
         δmin=δmin,
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
-        con_par = con_par)
+        con_par = con_par,
+        NumberOfFails = NumberOfFails)
     push!(psol_branch.points, psol_corrected)
     push!(psol_branch.tangents, V_new)
     push!(psol_branch.stepsizes, 0.0)
@@ -78,7 +79,7 @@ function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=no
 end
 
 # branch off near psol to psol with double period
-function SetupPsolBranch(jet, con_par, psol1::psol_pd, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, ntst = 20, ncol = 3)
+function SetupPsolBranch(jet, con_par, psol1::psol_pd, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, NumberOfFails = 4)
 
     dims = length(psol1.profile[1])
     ncol = psol1.ncol
@@ -149,7 +150,8 @@ function SetupPsolBranch(jet, con_par, psol1::psol_pd, τs; parameterbounds=noth
         δmin=δmin,
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
-        con_par = con_par)
+        con_par = con_par,
+        NumberOfFails = NumberOfFails)
     push!(psol_branch.points, psol_corrected)
     push!(psol_branch.tangents, V_new)
     push!(psol_branch.stepsizes, 0.0)
@@ -223,7 +225,7 @@ function remesh_psol(psol1, new_mesh, new_ncol)
     psol(γ_new, psol1.parameters, collect(new_mesh), psol1.period, new_ncol, nothing, nothing)
 end
 
-function psol_fold_res(jet,q₁,periodicsolution,psol_ref,τs)
+function psolLPC_res(jet,q₁,periodicsolution,psol_ref,τs)
     γ = periodicsolution.profile
     T = periodicsolution.period
     ncol = periodicsolution.ncol

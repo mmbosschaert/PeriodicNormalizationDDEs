@@ -8,12 +8,14 @@ m = length(τs)
 φ = reshape(Symbolics.get_variables(φ), n, m) # cast into a Matrix of symbols
 α = vec(reshape(Symbolics.get_variables(α), 2, 1))
 
-@variables v₁[1:n*length(τs)] v₂[1:n*length(τs)] v₃[1:n*length(τs)] p₁[1:2] p₂[1:2] p₃[1:2]
+@variables v₁[1:n*length(τs)] v₂[1:n*length(τs)] v₃[1:n*length(τs)] v₄[1:n*length(τs)] v₅[1:n*length(τs)] p₁[1:2] p₂[1:2] p₃[1:2]
 
 # TODO: replace vcat with Symbolics.scalarize
 v₁ = vcat(v₁)
 v₂ = vcat(v₂)
 v₃ = vcat(v₃)
+v₄ = vcat(v₄)
+v₅ = vcat(v₅)
 p₁ = vcat(p₁)
 p₂ = vcat(p₂)
 p₃ = vcat(p₃)
@@ -25,7 +27,10 @@ D11 = build_function(jac(jac(model(φ, α), φ[:])*v₁, α)*p₁, φ, α, v₁,
 D11v1 = build_function(jac(jac(model(φ, α), φ[:])*v₁, α), φ, α, v₁, expression=Val{false})[1]
 D12 = build_function(jac(jac(jac(model(φ, α), φ[:])*v₁, α)*p₁, α)*p₂, φ, α, v₁, p₁, p₂, expression=Val{false})[1]
 D21 = build_function(jac(jac(jac(model(φ, α), φ[:])*v₁, φ[:])*v₂, α)*p₁, φ, α, v₁, v₂, p₁, expression=Val{false})[1]
+D31 = build_function(jac(jac(jac(jac(model(φ, α), φ[:])*v₁, φ[:])*v₂, φ[:])*v₃, α)*p₁, φ, α, v₁, v₂, v₃, p₁, expression=Val{false})[1]
 D3 =  build_function(jac(jac(jac(model(φ, α), φ[:])*v₁, φ[:])*v₂, φ[:])*v₃, φ, α, v₁, v₂, v₃, expression=Val{false})[1]
+D4 =  build_function(jac(jac(jac(jac(model(φ, α), φ[:])*v₁, φ[:])*v₂, φ[:])*v₃, φ[:])*v₄, φ, α, v₁, v₂, v₃, v₄, expression=Val{false})[1]
+D5 = build_function(jac(jac(jac(jac(jac(model(φ, α), φ[:])*v₁, φ[:])*v₂, φ[:])*v₃, φ[:])*v₄, φ[:])*v₅, φ, α, v₁, v₂, v₃, v₄, v₅, expression=Val{false})[1]
 D01 = build_function(jac(model(φ, α), α), φ, α, expression = Val{false})[1]
 D02 = build_function(jac(jac(model(φ, α), α)*p₁, α)*p₂, φ, α, p₁, p₂, expression=Val{false})[1]
 D03 = build_function(jac(jac(jac(model(φ, α), α)*p₁, α)*p₂, α)*p₃, φ, α, p₁, p₂, p₃, expression=Val{false})[1]
@@ -67,7 +72,10 @@ jet = (
     D3=D3,
     D21=D21,
     D12=D12,
-    D03=D03)
+    D03=D03,
+    D4=D4,
+    D31=D31,
+    D5=D5)
 
 jet
 

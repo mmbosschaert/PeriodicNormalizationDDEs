@@ -15,7 +15,7 @@ function vec_to_point(vec,prev_stst::stst,con_par)
     stst(vec[1:dims], [params[1:con_par-1]; vec[dims+1]; params[con_par+1:end]])
 end
 
-function SetupStstBranch(model,con_par,eq,params,τs,dims; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.1, MaxNumberofSteps = 250)
+function SetupStstBranch(model,con_par,eq,params,τs,dims; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.1, MaxNumberofSteps = 250, NumberOfFails = 4)
     # generate code for continuation of steady points
     f = (x,_) -> model(repeat(x[1:dims],1,length(τs)), [params[1:con_par-1]; x[dims+1]; params[con_par+1:end]])
     @variables xx[1:dims+1] xx_prev[1:dims+1]
@@ -42,7 +42,8 @@ function SetupStstBranch(model,con_par,eq,params,τs,dims; parameterbounds=nothi
         δmin=δmin,
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
-        con_par = con_par)
+        con_par = con_par,
+        NumberOfFails = NumberOfFails)
     push!(stst_branch.points, stst1)
     push!(stst_branch.tangents, v₀)
     push!(stst_branch.stepsizes, 0.0)
