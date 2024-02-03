@@ -72,6 +72,7 @@ export point_to_genhopf
 export locate_genh
 export +, *
 export doubleHopfToPsol
+export generalizedHopfToPsol
 
 using LinearAlgebra
 using Symbolics
@@ -82,8 +83,8 @@ using NLsolve
 using Setfield
 using SparseArrays
 using NaNMath
-NaNMath.cos(x::Num) = cos(x)
-NaNMath.sin(x::Num) = sin(x)
+# NaNMath.cos(x::Num) = cos(x)
+# NaNMath.sin(x::Num) = sin(x)
 
 
 include("./characteristic_matrix.jl")

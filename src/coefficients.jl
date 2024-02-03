@@ -245,6 +245,13 @@ function nmfm_coefficient(jet,periodicsolution::psol_pd,τs,ap)
     c = dot(ptilde,Cτ(γ_interpolate,φ,φ,φ) + 3*Bτ(γ_interpolate,φ,h2) - 6*a*ζ(dφ))
     c /= 6*dot(ptilde,ζ(φ))
     c
+
+    J₁τ(γ) = vcat(Dγ.(γ,Ref(jet),colpoints[:],Ref(τs),Ref(par))...)
+
+    K01 = [-dot(rtilde[1:end-2], J₁τ(γ_interpolate)*[0.0; 1.0])
+      dot(rtilde[1:end-2], J₁τ(γ_interpolate)*[1.0; 0.0])]
+
+    dot(rtilde[1:end-2], J₁τ(γ_interpolate)*K01)
 end
 
 function h2_RHS(jet,M,par,φ,γ,a,ts,τs,T,colpoints,testintervals,dims,ncol)

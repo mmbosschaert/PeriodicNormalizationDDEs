@@ -101,6 +101,29 @@ function fold_tangent(jet,fold_guess,τs)
     v /= sqrt(vβnorm)
 end 
 
+# fucntion to create initial guess for LPC branch emanating from Generalized Hopf
+function generalizedHopfToPsol(jet, genh, ϵ, ntst, ncol, τs)
+    # extract normal form coefficients
+    q = genh.nmfm.q
+    h0001 = genh.nmfm.h0001(0)
+    h1100 = real(genh.nmfm.h1100(0))
+    h2000 = genh.nmfm.h2000(0)
+    γ110 = genh.nmfm.γ110
+    γ101 = genh.nmfm.γ101
+    γ210 = genh.nmfm.γ210
+    γ201 = genh.nmfm.γ201
+    c₁ = genh.nmfm.c₁
+    c₂ = genh.nmfm.c₂
+    ω₂ = genh.nmfm.ω₂
+
+    # construct initial guess
+    t = range(0.0,1.0, ntst*ncol + 1)
+    profile = [2*real(exp(2*pi*t*im)*q)*ϵ + (real(h1100) -2real(c₂)*h0001 + real(exp(4*pi*t*im)*h2000))*ϵ^2 for t ∈ t]
+    pars = genh.parameters + real([γ110 γ101; γ210 γ201])\[0.0; -2real(c₂)] * ϵ
+    T = 2pi/(abs(genh.ω) + (imag(c₁) - 2real(c₂)*ω₂)*ϵ^2)
+    psol(profile, pars, collect(t), T, ncol, nothing, nothing)
+end
+
 function vec(p::PsolLPC,_)
     [vcat(p.profile...); vcat(p.eigenvector...); p.parameters; p.period; p.beta ...]
 end

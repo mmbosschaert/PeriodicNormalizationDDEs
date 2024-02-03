@@ -14,6 +14,11 @@ function Dγ(φ₁::Function,φ₂::Function,jet,τ,periodicsolution,τs,ncol,ap
     jet.D2(γζ,par,Φ₁,Φ₂)
 end
 
+function Dγ(γ::Function,jet,τ,τs,par)
+    γ = hcat(γ.(τ,-τs)...)
+    jet.D01(γ,par)
+end
+
 # for branch continued with Julia
 function Dγ(γ::Function,φ₁::Function,φ₂::Function,jet,τ,τs,par)
     γ = hcat(γ.(τ,-τs)...)

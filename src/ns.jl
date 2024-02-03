@@ -171,7 +171,7 @@ function ns_w_approx(jet,periodicsolution,τs)
     # @show display([jac[1:end-1,:] rand(2dims*(ntst*ncol+1)); rand(2dims*(ntst*ncol+1)+1)'])
     # w = [jac[1:end-1,:] rand(2dims*(ntst*ncol+1)); rand(2dims*(ntst*ncol+1)+1)']\[zeros(2dims*(ntst*ncol+1)); 1.0]
     # w = nullspace(jac[1:end-1,:],atol=1e-02)[:,1]
-    # compute nullspace via scd
+    # compute nullspace via svd
     _, s, V = svd(jac)
     indxmin = last(findmin(s))
     w = V[:, indxmin]
@@ -193,7 +193,7 @@ function ns_w_approx(jet,periodicsolution,τs)
     # c1 = √(1/(∫(uζ,uζ) + ∫(vζ,vζ)) - c3)
 
     A = ∫(wζ,wζ)
-    B = ∫(vζ,vζ) - ∫(vζ,vζ)
+    B = ∫(vζ,vζ) - ∫(uζ,uζ)
     C = ∫(uζ,vζ)
 
     sqrt1 = (1 - B/sqrt(B^2 + 4*C^2))/A
@@ -489,7 +489,7 @@ function doubleHopfToPsol(jet, hoho, ϵ₁, ϵ₂, ntst, ncol, τs)
     β₁, β₂ = -real(g2100), -real(g1110)
     profile = [2*real(exp(2*pi*t*im)*q[1])*ϵ₁ + (β₁*h000010 + β₂*h000001 + h1100 + real(exp(4*pi*t*im)*h2000))*ϵ₁^2 for t ∈ t]
     pars = hoho.parameters + hoho.nmfm.K*[β₁; β₂]*ϵ₁^2
-    T = 2pi/(abs(hoho.ω₁) + b[1,1]*β₁ + b[1,2]*β₂ + imag(g2100)*ϵ₁^2)
+    T = 2pi/(abs(hoho.ω₁) + (b[1,1]*β₁ + b[1,2]*β₂ + imag(g2100))*ϵ₁^2)
     # T = 2pi/abs(hoho.ω₁)
     psol_guess1 = psol(profile, pars, collect(t), T, ncol, nothing, nothing)
     psol_guess1 = multipliers(jet, psol_guess1, τs)
@@ -498,7 +498,7 @@ function doubleHopfToPsol(jet, hoho, ϵ₁, ϵ₂, ntst, ncol, τs)
     β₁, β₂ = -real(g1011), -real(g0021)
     profile = [2*real(exp(2*pi*t*im)*q[2])*ϵ₂ + (β₁*h000010 + β₂*h000001 + h0011 + real(exp(4*pi*t*im)*h0020))*ϵ₂^2 for t ∈ t]
     pars = hoho.parameters + hoho.nmfm.K*[β₁; β₂]*ϵ₂^2
-    T = 2pi/(abs(hoho.ω₂) + b[1,2]*β₁ + b[2,2]*β₂ + imag(g0021)*ϵ₂^2)
+    T = 2pi/(abs(hoho.ω₂) + (b[2,1]*β₁ + b[2,2]*β₂ + imag(g0021))*ϵ₂^2)
     # T = 2pi/abs(hoho.ω₂)
     psol_guess2 = psol(profile, pars, collect(t), T, ncol, nothing, nothing)
     psol_guess2 = multipliers(jet, psol_guess2, τs)
@@ -537,23 +537,23 @@ function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin
             τs); 0.0] ...)
 
     df = (x,psol1) -> ns_res_jac(jet,
-                
-                        psol_ns(
-                            [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
-                            [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
-                            x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
-                            ns_guess.mesh, 
-                            x[3*dims*(ntst*ncol+1)+3],
-                            ns_guess.ncol, 
-                            ns_guess.stability,
-                            ns_guess.nmfm,
-                            x[3*dims*(ntst*ncol+1)+4]),
+            psol_ns(
+                [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                ns_guess.mesh, 
+                x[3*dims*(ntst*ncol+1)+3],
+                ns_guess.ncol, 
+                ns_guess.stability,
+                ns_guess.nmfm,
+                x[3*dims*(ntst*ncol+1)+4]),
             psol1,τs)
 
     # solve with own newton
     jac = df(x₀,ns_guess)
     V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
-    x₀new, _, V_new = newton(f, df, x₀, V, ns_guess; tol=1e-8)
+    x₀new, _, V_new, convergend = newton(f, df, x₀, V, ns_guess; tol=1e-8)
+    @show convergend
 
     # convert ns_guess to psol_ns
     ns_corrected = vec_to_point(x₀new, ns_guess,nothing)

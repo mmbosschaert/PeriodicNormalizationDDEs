@@ -37,17 +37,19 @@ end
 DoubleHopf(coords,parameters,v,ω₀,ω₁) = DoubleHopf(coords,parameters,v,ω₀,ω₁,nothing,nothing)
 
 mutable struct GenHopfNormalform
-    b12
-    c1
-    c2
-    phi
-    K01
-    h10mu
-    h00mu
-    h1100
+    γ110
+    γ101
+    γ210
+    γ201
+    c₁
+    c₂
+    ℓ₁
+    ℓ₂
+    q
     h2000
-    h3000
-    h2100
+    h1100
+    h0001
+    ω₂
 end
 
 mutable struct GenHopf
@@ -108,7 +110,6 @@ end
 function Hopf_res!(res, model, τs, Δre, Δim, xx, hopf_prev::Hopf, n)
     x, α, vre, vim , ω = xx[1:n], xx[n+1:n+2], xx[n+3:2n+2], xx[2n+3:3n+2], xx[3n+3]
     vre_prev, vim_prev = real(hopf_prev.v), imag(hopf_prev.v)
-
 
     res[1:n] = model(repeat(x,1,length(τs)),α)
     res[n+1:2n]  = Δre(repeat(x,1,length(τs)),α,ω)*vre - Δim(repeat(x,1,length(τs)),α,ω)*vim
@@ -183,7 +184,7 @@ function detect_genh(jet, branch, τs)
     findall(!iszero,sign.(nmfm)[2:end] - sign.(nmfm)[1:end-1])
 end
 
-# add to Hopf points
+# add two Hopf points
 +(hopf1::Hopf, hopf2::Hopf) = Hopf(hopf1.coords + hopf2.coords, hopf1.parameters + hopf2.parameters, hopf1.v + hopf2.v, hopf1.ω + hopf2.ω)
 
 # multiply Hopf point with scalar
@@ -275,4 +276,42 @@ function hopf_from_hoho(jet, hoho1, τs; ϵ = 1e-03)
     c = sqrt(1/(dot(real(hopf1.v),real(hopf_prev.v)) - dot(imag(hopf1.v),imag(hopf_prev.v))))
     c = sqrt(1/(dot(real(hopf1.v),real(hopf1.v)) - dot(imag(hopf1.v),imag(hopf1.v))))
     hopf1 = @set hopf1.v = c*q1
+end
+
+function LocateDoubleHopfPoints(jet,branch,τs)
+    # search for double Hopf bifucation points along the Hopf branch
+    ind_double_hopf = locate_double_hopf(branch)
+
+    # correct potential double Hopf points
+    n = length(branch.points[1].coords)
+    @variables xx[1:5n+3] xx_prev[1:5n+3]
+    xx = vcat(xx...)
+    xx_prev = vcat(xx_prev...)
+    res = similar(xx)
+    Δre, Δim = characteristic_matrices_unevaluated_re_im(jet.system, 2, τs)
+
+    params = branch.points[1].parameters
+    con_par = branch.con_par
+    params[1:con_par-1]; xx[n+1]; params[con_par+1:end]
+    Hopf_res!(res, jet.system, τs, Δre, Δim, [xx[1:n]; params[1:con_par-1]; xx[n+1]; params[con_par+1:end]; xx[n+2:end]] , [xx_prev[1:n]; params[1:con_par-1]; xx_prev[n+1]; params[con_par+1:end]; xx_prev[n+2:end]], n)
+    hopfJac = Symbolics.jacobian(res,xx)
+
+    f  = build_function(res,    xx,xx_prev,expression=Val{false})[1]
+    Df = build_function(hopfJac,xx,xx_prev,expression=Val{false})[1]
+
+    hopf_points = []
+    for point in branch.points[ind_hopf]
+        ind_omega = sortperm(abs.(real(point.stability)))
+        ω₀ = abs(imag(point.stability[ind_omega[1]]))
+        F = eigen(jet.Δ(repeat(point.coords,1,length(τs)),[params[1:con_par-1]; point.parameters[con_par]; params[con_par+1:end]],ω₀*im))
+        hopf = Hopf(point.coords, point.parameters, F.vectors[:,1], ω₀, nothing, nothing)
+
+        x₀ = vcat([hopf.coords, hopf.parameters[con_par], real(hopf.v), imag(hopf.v), hopf.ω]...)
+        
+        x₁, _ = DDEBifTool.newton(f, Df, x₀, x₀, tol = 1e-14)
+        hopf = Hopf(x₁[1:n], [params[1:con_par-1]; x₁[n+1]; params[con_par+1:end]], x₁[n+2:2n+1] + x₁[2n+2:3n+1]*im, x₁[end], nothing, nothing)
+        push!(hopf_points, hopf)
+    end
+
+    hopf_points
 end
