@@ -29,57 +29,59 @@
 #     x₀, iterations, V
 # end
 
-function newton(f, df, x₀, x₀prev, v₀, n; tol = 1e-10, maxIter = 100)
-    iterations = 0
-    for i=1:maxIter
-        fx = f(x₀, x₀prev)
-        if norm(fx) < tol
-            iterations = i
-            break
-        end
-
-        jac = df(x₀,x₀prev)
-        D = [jac; v₀']\[[fx; 0.0] [zeros(3n+2); 1.0]]
-        dx = D[:,1]
-        v₀ = D[:,2]/norm(D[:,2])
-        x₀ = x₀ - dx
+function newton(f, df, x₀, x₀prev, v₀, n; tol=1e-10, maxIter=100)
+  iterations = 0
+  for i = 1:maxIter
+    fx = f(x₀, x₀prev)
+    if norm(fx) < tol
+      iterations = i
+      break
     end
-    x₀, iterations, v₀
+
+    jac = df(x₀, x₀prev)
+    D = [jac; v₀'] \ [[fx; 0.0] [zeros(3n + 2); 1.0]]
+    dx = D[:, 1]
+    v₀ = D[:, 2] / norm(D[:, 2])
+    x₀ = x₀ - dx
+  end
+  x₀, iterations, v₀
 end
 
-function newton(f, df, x₀, x₀prev; tol = 1e-10, maxIter = 100)
-    iterations = 0
-    for i=1:maxIter
-        fx = f(x₀, x₀prev)
-        if norm(fx) < tol
-            iterations = i
-            break
-        end
-
-        jac = df(x₀,x₀prev)
-        dx = jac\fx
-        x₀ = x₀ - dx
+function newton(f, df, x₀, x₀prev; tol=1e-10, maxIter=100)
+  iterations = 0
+  converged = false
+  for i = 1:maxIter
+    fx = f(x₀, x₀prev)
+    if norm(fx) < tol
+      iterations = i
+      converged = true
+      break
     end
-    x₀, iterations
+
+    jac = df(x₀, x₀prev)
+    dx = jac \ fx
+    x₀ = x₀ - dx
+  end
+  x₀, iterations, converged
 end
 
 function newton(f, df, x₀, V, x_ref; tol=1e-8, maxiterations=20)
-    iterations = 0
-    converged = false
-    for i=1:maxiterations
-        fx = f(x₀,x_ref)
-        if norm(fx) < tol
-            iterations = i
-            converged = true
-            break
-        end
-        jac = df(x₀,x_ref)
-        jac[end,:] = V'
-
-        D = jac\[fx [zeros(length(V)-1); 1.0]]
-        dx = D[:,1]
-        V = D[:,2]/norm(D[:,2])
-        x₀ = x₀ - dx
+  iterations = 0
+  converged = false
+  for i = 1:maxiterations
+    fx = f(x₀, x_ref)
+    if norm(fx) < tol
+      iterations = i
+      converged = true
+      break
     end
-    x₀, iterations, V, converged
+    jac = df(x₀, x_ref)
+    jac[end, :] = V'
+
+    D = jac \ [fx [zeros(length(V) - 1); 1.0]]
+    dx = D[:, 1]
+    V = D[:, 2] / norm(D[:, 2])
+    x₀ = x₀ - dx
+  end
+  x₀, iterations, V, converged
 end

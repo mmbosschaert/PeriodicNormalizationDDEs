@@ -73,6 +73,7 @@ export locate_genh
 export +, *
 export doubleHopfToPsol
 export generalizedHopfToPsol
+export LocateDoubleHopf
 
 using LinearAlgebra
 using Symbolics
