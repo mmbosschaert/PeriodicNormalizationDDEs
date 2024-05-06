@@ -8,6 +8,17 @@ struct psol{T}
     nmfm::Union{ComplexF64,Nothing}
 end
 
+# Define custom show function for psol
+function Base.show(io::IO, p::psol{T}) where T
+    println(io, BOLD, "Profile:", RESET, " $(p.profile)")
+    println(io, BOLD, "Parameters:", RESET, " $(p.parameters)")
+    println(io, BOLD, "Mesh:", RESET, " $(p.mesh)")
+    println(io, BOLD, "Period:", RESET, " $(p.period)")
+    println(io, BOLD, "Number of Columns:", RESET, " $(p.ncol)")
+    println(io, BOLD, "Stability:", RESET, " $(p.stability)")
+    println(io, BOLD, "Normal Form:", RESET, " $(p.nmfm)")
+end
+
 struct psol_pd{T}
     profile::Vector{Vector{T}}
     eigenvector::Vector{Vector{T}}

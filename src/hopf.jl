@@ -181,8 +181,14 @@ function LocateDoubleHopf(jet, hoho_guess, τs; MaxIter=100, tol=1e-10)
     println("Newton did not converge")
   end
 
-  # return corrected double Hopf point
-  DDEBifTool.vec_to_point(x₀, hoho_guess, nothing)
+  # convert corrected double Hopf point
+  hoho = DDEBifTool.vec_to_point(x₀, hoho_guess, nothing)
+
+  # add stability information
+  hoho = stability(jet, hoho, τs)
+
+  # return double Hopf point
+  hoho
 end
 
 function defining_system_Hopf(jet, τs, dims)

@@ -10,6 +10,23 @@ struct PsolLPC{T}
     beta::T
 end
 
+# ANSI escape sequences for bold formatting
+const BOLD = "\e[1m"
+const RESET = "\e[0m"
+
+# Define custom show function for PsolLPC
+function Base.show(io::IO, p::PsolLPC{T}) where T
+    println(io, BOLD, "Profile:", RESET, " $(p.profile)")
+    println(io, BOLD, "Eigenvector:", RESET, " $(p.eigenvector)")
+    println(io, BOLD, "Parameters:", RESET, " $(p.parameters)")
+    println(io, BOLD, "Mesh:", RESET, " $(p.mesh)")
+    println(io, BOLD, "Period:", RESET, " $(p.period)")
+    println(io, BOLD, "Number of Columns:", RESET, " $(p.ncol)")
+    println(io, BOLD, "Stability:", RESET, " $(p.stability)")
+    println(io, BOLD, "Normal Form:", RESET, " $(p.nmfm)")
+    println(io, BOLD, "Beta:", RESET, " $(p.beta)")
+end
+
 function +(p1::PsolLPC,p2::PsolLPC)
     PsolLPC(
          p1.profile .+ p2.profile,

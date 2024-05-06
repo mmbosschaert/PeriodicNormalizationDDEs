@@ -83,5 +83,6 @@ function newton(f, df, x₀, V, x_ref; tol=1e-8, maxiterations=20)
     V = D[:, 2] / norm(D[:, 2])
     x₀ = x₀ - dx
   end
+
   x₀, iterations, V, converged
 end

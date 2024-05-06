@@ -27,16 +27,57 @@ mutable struct DoubleHopf
 end
 DoubleHopf(coords, parameters, v₁, v₂, ω₁, ω₂) = DoubleHopf(coords, parameters, v₁, v₂, ω₁, ω₂, nothing, nothing)
 
+# Define custom show function for DoubleHopfNormalform
+Base.show(io::IO, nf::DoubleHopfNormalform) = begin
+  println(io, "q: $(nf.q)")
+  println(io, "g2100: $(nf.g2100)")
+  println(io, "g1011: $(nf.g1011)")
+  println(io, "g1110: $(nf.g1110)")
+  println(io, "g0021: $(nf.g0021)")
+  println(io, "θ: $(nf.θ)")
+  println(io, "δ: $(nf.δ)")
+  println(io, "b: $(nf.b)")
+  println(io, "K: $(nf.K)")
+  println(io, "h0000: $(nf.h0000)")
+  println(io, "h0011: $(nf.h0011)")
+  println(io, "h0020: $(nf.h0020)")
+  println(io, "h2000: $(nf.h2000)")
+  println(io, "h1100: $(nf.h1100)")
+end
+
+# Define custom show function for DoubleHopf
+Base.show(io::IO, hopf::DoubleHopf) = begin
+  println(io, "Coordinates: $(hopf.coords)")
+  println(io, "Parameters: $(hopf.parameters)")
+  println(io, "V₁: $(hopf.v₁)")
+  println(io, "V₂: $(hopf.v₂)")
+  println(io, "ω₁: $(hopf.ω₁)")
+  println(io, "ω₂: $(hopf.ω₂)")
+  println(io, "Stability: $(hopf.stability)")
+  println(io, "Normal form: $(hopf.nmfm)")
+end
+
+function closest_eigenvalues_to_imaginary_axis(eigenvalues; num_closest=4)
+  # Calculate the distance of each eigenvalue to the imaginary axis (real part)
+  distances = abs.(real(eigenvalues))
+
+  # Sort the indices of eigenvalues by their distance to the imaginary axis
+  sorted_indices = sortperm(distances)
+
+  # Select the indices of the closest eigenvalues
+  closest_indices = sorted_indices[1:num_closest]
+
+  # Return the corresponding eigenvalues
+  return eigenvalues[closest_indices]
+end
+
 function point_to_hoho(jet, p, τs)
   if p.stability === nothing
     println("Need to calculate stability")
     return nothing
   else
-    ω_indx = findall(x -> abs(real(x)) < 1e-02, p.stability)
-    if length(ω_indx) !== 4
-      println("Unable to extract frequencies")
-    end
-    ω₁, ω₂ = sort(abs.(imag(p.stability[ω_indx])))[[1, 3]]
+    freqs = closest_eigenvalues_to_imaginary_axis(p.stability)
+    ω₁, ω₂ = sort(abs.(imag(freqs)))[[1, 3]]
 
     m = length(τs)
     φ = repeat(p.coords, 1, m)

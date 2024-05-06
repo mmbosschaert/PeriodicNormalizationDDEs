@@ -13,7 +13,7 @@ end
 function psol_to_ns(ns_guess)
     # find frequency
     indx = findmin(abs.(abs.(ns_guess.stability) .- 1.0))
-    ω = atan(imag(ns_guess.stability[indx[2]]),real(ns_guess.stability[indx[2]]))
+    ω = abs(atan(imag(ns_guess.stability[indx[2]]),real(ns_guess.stability[indx[2]])))
 
     # construct ns struct
     psol_ns(ns_guess.profile,
@@ -482,7 +482,7 @@ function doubleHopfToPsol(jet, hoho, ϵ₁, ϵ₂, ntst, ncol, τs)
     h1100 = real(hoho.nmfm.h1100(0))
     h0011 = real(hoho.nmfm.h0011(0))
     h2000 = hoho.nmfm.h2000(0)
-    h0020 = real(hoho.nmfm.h0020(0))
+    h0020 = hoho.nmfm.h0020(0)
     b = hoho.nmfm.b
 
     t = range(0.0,1.0, ntst*ncol + 1) # time mesh
@@ -504,6 +504,15 @@ function doubleHopfToPsol(jet, hoho, ϵ₁, ϵ₂, ntst, ncol, τs)
     psol_guess2 = multipliers(jet, psol_guess2, τs)
 
     psol_guess1, psol_guess2
+end
+
+function doubleHopfToNS(jet, hoho, ϵ₁, ϵ₂, ntst, ncol, τs)
+    psol_guess = doubleHopfToPsol(jet, hoho, ϵ₁, ϵ₂, ntst, ncol, τs)
+    ns_guess = [psol_to_ns(psol_guess[i]) for i in 1:2]
+    for i = 1:2
+      ns_guess[i] = ns_w_approx(jet,ns_guess[i],τs);
+    end
+    ns_guess
 end
 
 function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250,
@@ -573,5 +582,82 @@ function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin
     push!(ns_branch.points, ns_corrected)
     push!(ns_branch.tangents, V_new)
     push!(ns_branch.stepsizes, 0.0)
+    ns_branch
+end
+
+function SetupNSBranch(jet, hoho, ϵ₁, ϵ₂, ntst, ncol,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250,
+    NumberOfFails = 4, amplification_factor = 1.1)
+
+    # obtain dimension of the system
+    dims = length(hoho.coords)
+
+    # create timemesh
+    t = collect(range(0.0,1.0, ntst*ncol + 1))
+
+    # define the residual and jacobian
+    f = (x,psol_prev) -> vcat(
+    [psol_ns_res(jet,
+            psol_ns(
+                [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                t, 
+                x[3*dims*(ntst*ncol+1)+3],
+                ncol, 
+                nothing,
+                nothing, 
+                x[3*dims*(ntst*ncol+1)+4]),
+            psol_prev,
+            τs); 0.0] ...)
+
+    df = (x,psol_prev) -> ns_res_jac(jet,
+            psol_ns(
+                [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                t,
+                x[3*dims*(ntst*ncol+1)+3],
+                ncol, 
+                nothing,
+                nothing,
+                x[3*dims*(ntst*ncol+1)+4]),
+            psol_prev,τs)
+
+    # construct Neimark-Sacker branches
+    ns_branchI = (points = psol_ns[], tangents = [], stepsizes = [], 
+        f = f, df = df,
+        parameterbounds=parameterbounds,
+        δ=δ,
+        δmin=δmin,
+        δmax=δmax,
+        MaxNumberofSteps = MaxNumberofSteps,
+        con_par = nothing,
+        NumberOfFails = NumberOfFails
+    )
+    ns_branchII = deepcopy(ns_branchI)
+    ns_branch = (ns_branchI, ns_branchII)
+
+    for ϵ ∈ vcat(1, amplification_factor)
+      # obtain Neimark-Sacker guesses
+      ns_guess = doubleHopfToNS(jet, hoho, ϵ*ϵ₁, ϵ*ϵ₂, ntst, ncol, τs)
+
+      # convert to vector for Newton
+      x₀ = [vec(ns_guess[i],nothing) for i in 1:2]
+
+      # solve with newton
+      for i=1:2
+        jac = df(x₀[i], ns_guess[i])
+        V = [jac[1:end-1,:]; rand(length(x₀[i]))']\[zeros(length(x₀[i])-1); 1.0]
+        x₀new, _, V_new, convergend = newton(f, df, x₀[i], V, ns_guess[i]; tol=1e-8)
+        @show convergend
+        # convert ns_guess vector to psol_ns
+        ns_corrected = [vec_to_point(x₀new, ns_guess[i], nothing) for i in 1:2]
+        push!(ns_branch[i].points, ns_corrected[i])
+        push!(ns_branch[i].tangents, V_new)
+        push!(ns_branch[i].stepsizes, 0.0)
+      end
+    end
+
+    # retun branches
     ns_branch
 end

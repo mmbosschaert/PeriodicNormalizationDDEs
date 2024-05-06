@@ -51,13 +51,28 @@ function nmfm_coefficient(jet, periodicsolution::psol_ns, τs, ap)
   colpoints = hcat([ts[i*ncol+1] .+ (ts[(i+1)*ncol+1] - ts[i*ncol+1]) / 2 .* (nodes .+ 1) for i in 0:ntst-1]...)
   testintervals = ts[1:ncol:end]
 
+  # if T < τs[end]
+  #   println("Delay larger than period.")
+  #   # break
+  # end
+
   γτs = [hcat(interpolateT.(ζ, -τs, Ref(γ), T, Ref(ts), ncol)...) for ζ ∈ colpoints[:]]
   ζ(φ) = vcat(φ.(colpoints[:], 0) + sum(M[j].(γτs, Ref(par)) .* (τs[j] * φ.(colpoints[:], -τs[j])) for j ∈ 2:length(τs))...)
-  Bτ(γ, φ₁, φ₂) = vcat(Dγ.(γ, φ₁, φ₂, Ref(jet), colpoints[:], Ref(τs), Ref(par))...)
-  Cτ(γ, φ₁, φ₂, φ₃) = vcat(Dγ.(γ, φ₁, φ₂, φ₃, Ref(jet), colpoints[:], Ref(τs), Ref(par))...)
 
   jac = differential_equation_part_complex(M, γ, ts, par, τs, T, im * ω / T, colpoints, dims, ntst, ncol, testintervals)
-  q1, p1 = borderedInverse(jac, [zeros(dims * (ncol * ntst + 1)); 1.0], ntst, ncol, dims, ts, normalization=false)
+  # q1, p1 = borderedInverse(jac, [zeros(dims * (ncol * ntst + 1)); 1.0], ntst, ncol, dims, ts, normalization=false)
+
+  _, s, V = svd(jac[1:end-1, :]')
+  indxmin = last(findmin(s))
+  p1 = V[:, indxmin]
+
+  _, s, V = svd(jac[1:end-1, :])
+  indxmin = last(findmin(s))
+  q1 = V[:, indxmin]
+
+  # q1 = q1[1:end-1]
+  q1 = [vec(reshape(q1[dims*(i-1)+1:dims*i], dims, 1)) for i ∈ eachindex(ts)]
+  p1 = p1[1:end-2]
 
   # normalize \int_^T <q1,q1> = 1 with Newton-Cotes
   weights = newtonCotesWeights(ncol)
@@ -71,7 +86,11 @@ function nmfm_coefficient(jet, periodicsolution::psol_ns, τs, ap)
   φ(τ, θ) = interpolateT(τ, θ, q1, T, ts, ncol) * exp(im * ω * θ / T)
   dφ(τ, θ) = d_interpolateT(τ, θ, q1, T, ts, ncol) * exp(im * ω * θ / T)
 
-  rhs = Bτ(γ_interpolate, φ, φ)
+  # define multi-linear forms
+  Bτ(φ₁, φ₂) = vcat(Dγ.(Ref(γ_interpolate), φ₁, φ₂, Ref(jet), colpoints[:], Ref(τs), Ref(par))...)
+  Cτ(φ₁, φ₂, φ₃) = vcat(Dγ.(Ref(γ_interpolate), φ₁, φ₂, φ₃, Ref(jet), colpoints[:], Ref(τs), Ref(par))...)
+
+  rhs = Bτ(φ, φ)
   jac = differential_equation_part_complex(M, γ, ts, par, τs, T, 2im * ω / T, colpoints, dims, ntst, ncol, testintervals)
   # sort(eigen(jac[1:end-1,:]).values, by=x->norm(x))[1:3]
   u20 = jac[1:end-1, :] \ [rhs; zeros(dims)]
@@ -80,16 +99,19 @@ function nmfm_coefficient(jet, periodicsolution::psol_ns, τs, ap)
   h20(τ, θ) = interpolateT(τ, θ, u20, T, ts, ncol) * exp(2im * ω * θ / T)
 
   jac = differential_equation_part(M, γ, ts, par, τs, T, colpoints, dims, ntst, ncol, testintervals)
-  r = leftnullvector(jac, ntst, ncol, dims)
+  # r = leftnullvector(jac, ntst, ncol, dims)
+  _, s, V = svd(jac[1:end-1, :]')
+  indxmin = last(findmin(s))
+  r = V[:, indxmin][1:end-2]
 
   dγ(τ, θ) = d_interpolateT(τ, θ, γ, T, ts, ncol)
 
-  a = dot(r, Bτ(γ_interpolate, φ, conj ∘ φ)) / dot(r, ζ(dγ))
-  rhs = real(Bτ(γ_interpolate, φ, conj ∘ φ) - a * ζ(dγ))
+  a = dot(r, Bτ(φ, conj ∘ φ)) / dot(r, ζ(dγ))
+  rhs = real(Bτ(φ, conj ∘ φ) - a * ζ(dγ))
   u11, _ = borderedInverse(jac, [rhs; zeros(dims + 1)], ntst, ncol, dims, ts, normalization=false)
   h11(τ, θ) = interpolateT(τ, θ, u11, T, ts, ncol) + θ * a * d_interpolateT(τ, θ, γ, T, ts, ncol)
 
-  d = dot(p1[1:end-2], Cτ(γ_interpolate, φ, φ, conj ∘ φ) + Bτ(γ_interpolate, φ, h11) + Bτ(γ_interpolate, h20, conj ∘ φ) - 2 * a * ζ(dφ)) / 2 / dot(p1[1:end-2], ζ(φ))
+  d = dot(p1, Cτ(φ, φ, conj ∘ φ) + 2Bτ(φ, h11) + Bτ(h20, conj ∘ φ) - 2 * a * ζ(dφ)) / 2 / dot(p1, ζ(φ))
 
   d
 end
@@ -246,12 +268,12 @@ function nmfm_coefficient(jet, periodicsolution::psol_pd, τs, ap)
   c /= 6 * dot(ptilde, ζ(φ))
   c
 
-  J₁τ(γ) = vcat(Dγ.(γ, Ref(jet), colpoints[:], Ref(τs), Ref(par))...)
+  # J₁τ(γ) = vcat(Dγ.(γ, Ref(jet), colpoints[:], Ref(τs), Ref(par))...)
 
-  K01 = [-dot(rtilde[1:end-2], J₁τ(γ_interpolate) * [0.0; 1.0]);
-    dot(rtilde[1:end-2], J₁τ(γ_interpolate) * [1.0; 0.0])]
+  # K01 = [-dot(rtilde[1:end-2], J₁τ(γ_interpolate) * [0.0; 1.0]);
+  #   dot(rtilde[1:end-2], J₁τ(γ_interpolate) * [1.0; 0.0])]
 
-  dot(rtilde[1:end-2], J₁τ(γ_interpolate) * K01)
+  # dot(rtilde[1:end-2], J₁τ(γ_interpolate) * K01)
 end
 
 function h2_RHS(jet, M, par, φ, γ, a, ts, τs, T, colpoints, testintervals, dims, ncol)

@@ -87,7 +87,6 @@ using NaNMath
 # NaNMath.cos(x::Num) = cos(x)
 # NaNMath.sin(x::Num) = sin(x)
 
-
 include("./characteristic_matrix.jl")
 include("./characteristic_matrix_unevaluated.jl")
 include("./coefficient_matrices.jl")
