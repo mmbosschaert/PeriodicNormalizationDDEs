@@ -6,12 +6,12 @@ using DataFrames
 using GLM
 
 # define constants, and active parameters (ap)
-const gᵤ = 0.1
-const gᵥ = 0.52
-const β = 0.1
-const ap = [1, 2]
-const dims = 2
-const τs = [0.0; 1.0]
+const gᵤ = 0.1;
+const gᵥ = 0.52;
+const β = 0.1;
+const ap = [1, 2];
+const dims = 2;
+const τs = [0.0; 1.0];
 
 # define model
 function acs(u, p)
@@ -52,7 +52,7 @@ genh1 = normalform(jet, genh1, τs)
 ntst = 20
 ncol = 3
 
-δps1 = exp10.(LinRange(-1.4, 0, 20))
+δps1 = exp10.(LinRange(-1.3, -0.8, 20))
 relative_errors_second_order = zeros(length(δps1))
 for (i, δp) in enumerate(δps1)
   lpc_guess = generalizedHopfToPsol(jet, genh1, δp, ntst, ncol, τs)
@@ -76,7 +76,7 @@ lines!(log10.(collect(δps1)), coeffs_second_order[1] .+ log10.(collect(δps1 .^
 genh1 = point_to_genhopf(jet, stst1, τs)
 genh1 = DDEBifTool.normalform_beta(jet, genh1, τs)
 
-δps2 = exp10.(LinRange(-1.4, 0, 20))
+δps2 = exp10.(LinRange(-1.3, -0.8, 20))
 relative_errors_higher_order = zeros(length(δps2))
 for (i, δp) in enumerate(δps2)
   lpc_guess = DDEBifTool.generalizedHopfToPsolHigherOrder(jet, genh1, δp, ntst, ncol, τs)
@@ -95,5 +95,6 @@ fig = Figure()
 ax = Axis(fig[1, 1], xlabel="δp", ylabel="Relative error", title="Convergence plot for Active control system")
 scatter!(log10.(collect(δps1)), log10.(relative_errors_second_order), label="second order")
 lines!(log10.(collect(δps1)), coeffs_second_order[1] .+ log10.(collect(δps1 .^ coeffs_second_order[2])))
-scatter!(log10.(collect(δps2)), log10.(relative_errors_higher_order), label="second order")
+scatter!(log10.(collect(δps2)), log10.(relative_errors_higher_order), label="higher order")
 lines!(log10.(collect(δps2)), coeffs_higher_order[1] .+ log10.(collect(δps2 .^ coeffs_higher_order[2])))
+axislegend()
