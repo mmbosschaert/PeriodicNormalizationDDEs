@@ -17,6 +17,27 @@ function vec_to_point(v::Vector{Float64}, ::Hopf, _)
   Hopf(v[1:dims], v[dims+1:2dims], v[2dims+1:3dims] + v[3dims+1:4dims] * im, v[4dims+1])
 end
 
+function point_to_hopf(jet, p::stst, τs)
+  if p.stability === nothing
+    println("Need to calculate stability")
+    return nothing
+  else
+    freqs = DDEBifTool.closest_eigenvalues_to_imaginary_axis(p.stability)
+    ω = first(sort(abs.(imag(freqs))))
+
+    m = length(τs)
+    φ = repeat(p.coords, 1, m)
+    Δ(λ) = jet.Δ(φ, p.parameters, λ)
+
+    λ = ω * im
+
+    _, s, V = svd(Δ(λ))
+    indxmin = last(findmin(s))
+    V = V[:, indxmin]
+    Hopf(p.coords, p.parameters, V, ω, p.stability, nothing)
+  end
+end
+
 function Hopf_res!(res, model, τs, Δre, Δim, xx, xx_prev, n)
   x, α, vre, vim, ω = xx[1:n], xx[n+1:n+2], xx[n+3:2n+2], xx[2n+3:3n+2], xx[3n+3]
   vre_prev, vim_prev = xx_prev[n+3:2n+2], xx_prev[2n+3:3n+2]
