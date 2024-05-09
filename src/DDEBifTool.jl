@@ -74,6 +74,7 @@ export +, *
 export doubleHopfToPsol
 export generalizedHopfToPsol
 export LocateDoubleHopf
+export point_to_hopf
 
 using LinearAlgebra
 using Symbolics
