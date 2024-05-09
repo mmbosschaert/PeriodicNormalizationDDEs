@@ -52,7 +52,7 @@ genh1 = normalform(jet, genh1, τs)
 ntst = 20
 ncol = 3
 
-δps1 = exp10.(LinRange(-1.3, -0.8, 20))
+δps1 = exp10.(LinRange(-1.2, -0.9, 20))
 relative_errors_second_order = zeros(length(δps1))
 for (i, δp) in enumerate(δps1)
   lpc_guess = generalizedHopfToPsol(jet, genh1, δp, ntst, ncol, τs)
@@ -76,7 +76,7 @@ lines!(log10.(collect(δps1)), coeffs_second_order[1] .+ log10.(collect(δps1 .^
 genh1 = point_to_genhopf(jet, stst1, τs)
 genh1 = DDEBifTool.normalform_beta(jet, genh1, τs)
 
-δps2 = exp10.(LinRange(-1.3, -0.8, 20))
+δps2 = exp10.(LinRange(-1.2, -0.9, 20))
 relative_errors_higher_order = zeros(length(δps2))
 for (i, δp) in enumerate(δps2)
   lpc_guess = DDEBifTool.generalizedHopfToPsolHigherOrder(jet, genh1, δp, ntst, ncol, τs)
@@ -97,4 +97,4 @@ scatter!(log10.(collect(δps1)), log10.(relative_errors_second_order), label="se
 lines!(log10.(collect(δps1)), coeffs_second_order[1] .+ log10.(collect(δps1 .^ coeffs_second_order[2])))
 scatter!(log10.(collect(δps2)), log10.(relative_errors_higher_order), label="higher order")
 lines!(log10.(collect(δps2)), coeffs_higher_order[1] .+ log10.(collect(δps2 .^ coeffs_higher_order[2])))
-axislegend()
+axislegend(position = :rb)
