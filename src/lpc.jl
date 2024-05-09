@@ -146,19 +146,23 @@ function SetupLPCBranch(jet,fold_guess,τs; parameterbounds=nothing, δ=.001, δ
                             [reshape(x[dims*(ntst*ncol+1)+1:2*dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
                             x[end],
                        psol([reshape(x[1:dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
-                            x[end-3:end-2], psol1.mesh, x[end-1], 
+                            x[end-3:end-2], psol1.mesh, x[end-1],
                             psol1.ncol, nothing, nothing),psol1,τs); 0.0 ...] ...)
 
     df = (x,psol1) -> defsystem_fold_jac_β(jet,
                 PsolLPC([reshape(x[1:dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
                       [reshape(x[dims*(ntst*ncol+1)+1:2dims*(ntst*ncol+1)],2,:)[:,j] for j in 1:ntst*ncol+1],
-                      x[end-3:end-2], psol1.mesh, x[end-1], 
+                      x[end-3:end-2], psol1.mesh, x[end-1],
                       psol1.ncol, nothing, nothing, x[end]),psol1,τs)
+
 
     # solve with own newton
     jac = df(x₀,fold_guess)
+    # jac_auto = Main.ForwardDiff.jacobian(x -> f(x, fold_guess), x₀)
     V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
-    x₀new, _, V_new = newton(f, df, x₀, V, fold_guess; tol=1e-8)
+    V /= norm(V)
+    x₀new, _, V_new, converged = newton(f, df, x₀, V, fold_guess; tol=1e-8)
+    @show converged
 
     # convert fold_guess to PsolLPC
     fold_guess = PsolLPC(
