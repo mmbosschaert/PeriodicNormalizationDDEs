@@ -6,6 +6,7 @@ using LinearAlgebra
 using DataFrames
 using GLM
 using Infiltrator
+using UnPack
 
 # define constants, and active parameters (ap)
 const b = 0.9
@@ -55,15 +56,15 @@ genh1 = normalform(jet, genh1, τs)
 ϵ = 0.01
 ntst = 20
 ncol = 3
-lpc_guess = generalizedHopfToPsol(jet, genh1, ϵ, ntst, ncol, τs)
+lpc_guess = generalizedHopfToPsol(jet, genh1, ϵ, ntst, ncol, τs);
 lpc_brI = SetupLPCBranch(jet, lpc_guess, τs, δ=0.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps=2000);
-continue!(lpc_brI)
-get_params(br) = hcat([point.parameters for point in br]...)
-lines(get_params(lpc_brI.points))
+continue!(lpc_brI);
+get_params(br) = hcat([point.parameters for point in br]...);
+lines(get_params(lpc_brI.points));
 
 genh1_higherorder = DDEBifTool.normalform_beta(jet, genh1, τs)
 
-@unpack K10, K01, K02, K11, c₂, c₃, a3201 = genh1_higherorder.nmfm
+@unpack K10, K01, K02, K11, K03, c₂, c₃, a3201 = genh1_higherorder.nmfm
 
 β₁ = ϵ -> real(c₂) * ϵ^4 + 2(real(c₃) - a3201 * real(c₂)) * ϵ^6
 β₂ = ϵ -> -2real(c₂) * ϵ^2 + (4a3201 * real(c₂) - 3 * real(c₃)) * ϵ^4
@@ -80,9 +81,14 @@ fig = Figure()
 ax = Axis(fig[1, 1], title = "FitzHugh-Nagumo model", xlabel = "β", ylabel = "α")
 lines!(get_params(hopf_branchI.points), label="Hopf branch", color=Cycled(2))
 scatter!(get_params(lpc_brI.points[1:10:300]), label="Computed Limit point cycle branch")
-lines!(hcat([params + K10 * β₁(ϵ) + K01 * β₂(ϵ) + 0.5K02 * β₂(ϵ)^2 + K11 * β₁(ϵ) * β₂(ϵ) for ϵ in 0.001:0.001:0.07]...),
+#lines!(hcat([params + K10 * β₁(ϵ) + K01 * β₂(ϵ) + 0.5K02 * β₂(ϵ)^2 + K11 * β₁(ϵ) * β₂(ϵ)  for ϵ in 0.001:0.001:0.07]...),
+       #label="Predicted Limit point cycle branch", color=Cycled(1))
+lines!(hcat([params  - 2real(c₂) * K01 * ϵ^2 + (real(c₂) * K10 + (4a3201 * real(c₂) - 3 * real(c₃)) * K01 + 2 * (real(c₂))^2 * K02) * ϵ^4 + (2(real(c₃) - a3201 * real(c₂)) * K10 - 2 * (real(c₂))^2 * K11 - 2real(c₂) * (4 * a3201 * real(c₂) - 3 * real(c₃)) * K02 - (8 / 6) * (real(c₂))^3 * K03) * ϵ^6 for ϵ in 0.001:0.001:0.07]...),
        label="Predicted Limit point cycle branch", color=Cycled(1))
 scatter!([genh1.parameters[1]], [genh1.parameters[2]], color=:black, label="Generalized Hopf point", markersize=10)
 xlims!(ax, 1.89985, 1.90005)
 ylims!(ax, -1.06, -1.02)
+hidedecorations!(ax, ticklabels=false, label=false, ticks=false)
 axislegend(ax, position=:lb)
+
+
