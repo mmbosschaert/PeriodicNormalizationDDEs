@@ -236,7 +236,8 @@ function normalform(jet, hopf::GenHopf, τs)
   p /= transpose(p) * (Δ′(λ) * q)
 
   # define border inverse of characteristic matrix
-  Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [q' 0]]\[y; 0])[1:end-1]
+  #Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [q' 0]]\[y; 0])[1:end-1]
+  Δᴵᴺⱽ(λ, y) = ([Δ(λ) q; [transpose(p) 0]]\[y; 0])[1:end-1]
   function Aᴵᴺⱽ(λ, η, κ)
     ξ = Δᴵᴺⱽ(λ, η + κ * Δ′(λ) * q)
     γ = first(transpose(p) * (-Δ′(λ) * ξ + 0.5 * κ * Δ′′(λ) * q))
@@ -344,8 +345,8 @@ function normalform_beta(jet, hopf::GenHopf, τs)
   p /= transpose(p) * (Δ′(λ) * q)
 
   # define border inverse of characteristic matrix
-  Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [q' 0]]\[y; 0])[1:end-1]
-  
+  #Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [q' 0]]\[y; 0])[1:end-1]
+  Δᴵᴺⱽ(λ, y) = ([Δ(λ) q; [transpose(p) 0]]\[y; 0])[1:end-1]
   function Aᴵᴺⱽ(λ, η, κ)
     ξ = Δᴵᴺⱽ(λ, η + κ * Δ′(λ) * q)
     γ = first(transpose(p) * (-Δ′(λ) * ξ + 0.5 * κ * Δ′′(λ) * q))
@@ -570,11 +571,11 @@ function normalform_beta(jet, hopf::GenHopf, τs)
                                           + B(h2000, conj ∘ Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2B(h1100, Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2B₁(ϕ, h1100, e₂) + B₁(conj ∘ ϕ, h2000, e₂)
                                           + C(ϕ, ϕ, conj ∘ Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2C(ϕ, conj ∘ ϕ, Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2C(ϕ, h1100, (θ -> Δ(0) \ (J₁ * e₂)))
                                           + C(conj ∘ ϕ, h2000, (θ -> Δ(0) \ (J₁ * e₂))) + C₁(ϕ, ϕ, conj ∘ ϕ, e₂) + D(ϕ, ϕ, conj ∘ ϕ, (θ -> Δ(0) \ (J₁ * e₂))))
-  ))) + imag(first(transpose(p) * Γ₂(ϕ))) * 0.5 * rP2
+  ))+ imag(first(transpose(p) * Γ₂(ϕ))) * 0.5 * rP2)
 
   P = [P11 P12; P21 P22]
 
-  Q210 = 0.5 * real(first(transpose(p) * (4B(ϕ, (θ -> ((Δ(0) \ (Δ′(0) - θ * Δ(0))) * h1100(θ) - (Δ(0) \ real(B(conj ∘ ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1)))))))
+  Q210 = 0.5 * real(first(transpose(p) * (4B(ϕ, (θ -> ((Δ(0) \ (Δ′(0) - θ * Δ(0))) * h1100(θ) + (Δ(0) \ real(B(conj ∘ ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1)))))))
                                           + 2 * B(conj ∘ ϕ, (θ -> ((Δ(2λ) \ (Δ′(2λ) - θ * Δ(2λ))) * h2000(θ) + (exp(2.0 * λ * θ) * (Δ(2.0 * λ) \ B(ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1)))))))
                                           + B(h2000, conj ∘ Aᴵᴺⱽ(λ, zeros(length(q)), 1)) + 2 * B(h1100, Aᴵᴺⱽ(λ, zeros(length(q)), 1)) + C(ϕ, ϕ, conj ∘ Aᴵᴺⱽ(λ, zeros(length(q)), 1))
                                           + 2 * C(ϕ, conj ∘ ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1))
@@ -600,13 +601,13 @@ function normalform_beta(jet, hopf::GenHopf, τs)
   h1110(θ) = Δ(0.0) \ (A₁(h1100, K10) + 2real(B(conj ∘ ϕ, h1010)) + B(h1100, h0010) + B₁(ϕ, conj ∘ ϕ, K10) + C(ϕ, conj ∘ ϕ, h0010)) - 2 * (Δ(0.0) \ (Δ′(0.0) - θ * Δ(0.0))) * h1100(θ)
   h1101(_) = Δ(0.0) \ (A₁(h1100, K01) + 2real(B(conj ∘ ϕ, h1001)) + B(h1100, h0001) + B₁(ϕ, conj ∘ ϕ, K01) + C(ϕ, conj ∘ ϕ, h0001))
 
-  M2101 = (A₁(h2100, K10) + B(conj ∘ ϕ, h2010) + 2B(ϕ, h1110) + B(h2100, h0010) + B(h2000, conj ∘ h1010)
-           + 2B(h1100, h1010) + B₁(h2000, conj ∘ ϕ, K10) + 2B₁(ϕ, h1100, K10) + 2C(ϕ, conj ∘ ϕ, h1010)
-           + C(h2000, conj ∘ ϕ, h0010) + C(ϕ, ϕ, conj ∘ h1010) + 2C(ϕ, h1100, h0010) + C₁(ϕ, ϕ, conj ∘ ϕ, K10) + D(ϕ, ϕ, conj ∘ ϕ, h0010))
-
-  M2110 = (A₁(h2100, K01) + B(conj ∘ ϕ, h2001) + 2B(ϕ, h1101) + B(h2100, h0001) + B(h2000, conj ∘ h1001)
+  M2101 = (A₁(h2100, K01) + B(conj ∘ ϕ, h2001) + 2B(ϕ, h1101) + B(h2100, h0001) + B(h2000, conj ∘ h1001)
            + 2B(h1100, h1001) + B₁(h2000, conj ∘ ϕ, K01) + 2B₁(ϕ, h1100, K01) + 2C(ϕ, conj ∘ ϕ, h1001)
            + C(h2000, conj ∘ ϕ, h0001) + C(ϕ, ϕ, conj ∘ h1001) + 2C(ϕ, h1100, h0001) + C₁(ϕ, ϕ, conj ∘ ϕ, K01) + D(ϕ, ϕ, conj ∘ ϕ, h0001))
+
+  M2110 = (A₁(h2100, K10) + B(conj ∘ ϕ, h2010) + 2B(ϕ, h1110) + B(h2100, h0010) + B(h2000, conj ∘ h1010)
+           + 2B(h1100, h1010) + B₁(h2000, conj ∘ ϕ, K10) + 2B₁(ϕ, h1100, K10) + 2C(ϕ, conj ∘ ϕ, h1010)
+           + C(h2000, conj ∘ ϕ, h0010) + C(ϕ, ϕ, conj ∘ h1010) + 2C(ϕ, h1100, h0010) + C₁(ϕ, ϕ, conj ∘ ϕ, K10) + D(ϕ, ϕ, conj ∘ ϕ, h0010))
 
   b201 = 0.5 * imag(first(transpose(p) * (M2101)))
   b210 = 0.5 * imag(first(transpose(p) * (M2110)))
@@ -769,7 +770,6 @@ function normalform_beta(jet, hopf::GenHopf, τs)
 
   h0002(_) = Δ(0) \ (J₁ * K02 + M0002)
   b102 = imag(first(transpose(p) * (A₁(ϕ, K02) + B(ϕ, h0002) + M1002)))
-
 
   h1002(θ) = Aᴵᴺⱽ(λ, A₁(ϕ, K02) + B(ϕ, h0002) + M1002, -im * b102)(θ) - 2 * im * b101 * A2ᴵᴺⱽ(λ, h1001(0), -im * b101)(θ)
 
