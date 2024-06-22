@@ -1042,12 +1042,12 @@ function generalizedHopfToPsol(jet, genh, ϵ, ntst, ncol, τs)
   c₂ = genh.nmfm.c₂
   ω₂ = genh.nmfm.ω₂
 
-  α = real([γ110 γ101; γ210 γ201]) \ [0.0; -2real(c₂)]
+  α = real([γ110 γ101; γ210 γ201]) \ [0.0; -2real(c₂ ) * ϵ^2]
 
   # construct initial guess
   t = range(0.0, 1.0, ntst * ncol + 1)
   profile = [2 * real(exp(2 * pi * t * im) * q) * ϵ + (real(h1100) + h0010 * α[1] + h0001 * α[2] + real(exp(4 * pi * t * im) * h2000)) * ϵ^2 for t ∈ t]
-  pars = genh.parameters + α * ϵ^2
+  pars = genh.parameters + α 
   T = 2pi / (abs(genh.ω) + (imag(c₁) - 2real(c₂) * ω₂) * ϵ^2)
   psol(profile, pars, collect(t), T, ncol, nothing, nothing)
 end
@@ -1120,23 +1120,25 @@ function generalizedHopfToPsolHigherOrder(jet, genh, ϵ, ntst, ncol, τs)
 
   # construct initial guess
   t = range(0.0, 1.0, ntst * ncol + 1)
-  profile = [(2 * real(exp(2 * pi * t * im) * q) * ϵ + h0010 * β₁ + h0001 * β₂ + (1 / 2) * β₂^2 * h0002 + β₁ * β₂ * h0011 + (1 / 6) * h0003 * β₂^3 
-              + 2real(exp(2 * pi * t * im) * h1010) * ϵ * β₁ + real(exp(4 * pi * t * im) * h2010) * ϵ^2 * β₁ + real(h1110) * ϵ^2 * β₁
-              + 2real(exp(2 * pi * t * im) * h1002) * ϵ * β₂^2 * (1 / 2) + real(exp(4 * pi * t * im) * h2002) * β₂^2 * (1 / 2) + real(h1102) * β₂^2 * (1 / 2)
-              + 2real(exp(2 * pi * t * im) * h1011) * ϵ *  β₁ * β₂ + 2real(exp(2 * pi * t * im) * h1003) * ϵ * β₂^3  * (1 / 6)
-              + 2real(exp(2 * pi * t * im) * h1001) * ϵ * β₂ + real(exp(4 * pi * t * im) * h2001) * ϵ^2 * β₂
-              + real(h1101) * ϵ^2 * β₂ + (2 / 6)real(exp(6 * pi * t * im) * h3001) * ϵ^3 * β₂ + real(exp(2 * pi * t * im) * h2101) * ϵ^3 * (1 / 2) * β₂
-              + (2 / 24)real(exp(8 * pi * t * im) * h4001) * ϵ^4 * β₂ + (2 / 6)real(exp(4 * pi * t * im) * h3101) * ϵ^4 * β₂ + (1 / 4) * real(h2201) * ϵ^4 * β₂
-              + (2 / 120)real(exp(10 * pi * t * im) * h5001) * ϵ^5 * β₂ + (2 / 24)real(exp(6 * pi * t * im) * h4101) * ϵ^5 * β₂ + (2 / 12)real(exp(2 * pi * t * im) * h3201) * ϵ^5 * β₂
-              + real(exp(4 * pi * t * im) * h2000) * ϵ^2 + real(h1100) * ϵ^2
-              + (2 / 6)real(exp(6 * pi * t * im) * h3000) * ϵ^3 + real(exp(2 * pi * t * im) * h2100) * ϵ^3
-              + (2 / 24)real(exp(8 * pi * t * im) * h4000) * ϵ^4 + (2 / 6)real(exp(4 * pi * t * im) * h3100) * ϵ^4 + (1 / 4) * real(h2200) * ϵ^4
-              + (2 / 120)real(exp(10 * pi * t * im) * h5000) * ϵ^5 + (2 / 24)real(exp(6 * pi * t * im) * h4100) * ϵ^5 + (2 / 12)real(exp(4 * pi * t * im) * h3200) * ϵ^5
-              + (2 / 720)real(exp(12 * pi * t * im) * h6000) * ϵ^6 + (2 / 120)real(exp(8 * pi * t * im) * h5100) * ϵ^6 + (2 / 48)real(exp(4 * pi * t * im) * h4200) * ϵ^6 + (1 / 36)real(h3300) * ϵ^6
-              + (2 / 5040)real(exp(14 * pi * t * im) * h7000) * ϵ^7 + (2 / 720)real(exp(10 * pi * t * im) * h6100) * ϵ^7 + (2 / 240)real(exp(6 * pi * t * im) * h5200) * ϵ^7 + (2 / 144)real(exp(2 * pi * t * im) * h4300) * ϵ^7) for t ∈ t] 
+  profile = profile = [(2 * real(exp(2 * pi * t * im) * q) * ϵ + h0010 * β₁ + h0001 * β₂ + (1 / 2) * β₂^2 * h0002 + β₁ * β₂ * h0011 + (1 / 6) * h0003 * β₂^3 
+  + 2real(exp(2 * pi * t * im) * h1010) * ϵ * β₁ + real(exp(4 * pi * t * im) * h2010) * ϵ^2 * β₁ + real(h1110) * ϵ^2 * β₁
+  + 2real(exp(2 * pi * t * im) * h1002) * ϵ * β₂^2 * (1 / 2) + real(exp(4 * pi * t * im) * h2002) * ϵ^2 * β₂^2 * (1 / 2) + real(h1102) * ϵ^2 * β₂^2 * (1 / 2)
+  + 2real(exp(2 * pi * t * im) * h1011) * ϵ *  β₁ * β₂ + 2real(exp(2 * pi * t * im) * h1003) * ϵ * β₂^3  * (1 / 6)
+  + 2real(exp(2 * pi * t * im) * h1001) * ϵ * β₂ + real(exp(4 * pi * t * im) * h2001) * ϵ^2 * β₂
+  + real(h1101) * ϵ^2 * β₂ + (2 / 6)real(exp(6 * pi * t * im) * h3001) * ϵ^3 * β₂ + real(exp(2 * pi * t * im) * h2101) * ϵ^3 * β₂
+  + (2 / 24)real(exp(8 * pi * t * im) * h4001) * ϵ^4 * β₂ + (2 / 6)real(exp(4 * pi * t * im) * h3101) * ϵ^4 * β₂ + (1 / 4) * real(h2201) * ϵ^4 * β₂
+  + (2 / 120)real(exp(10 * pi * t * im) * h5001) * ϵ^5 * β₂ + (2 / 24)real(exp(6 * pi * t * im) * h4101) * ϵ^5 * β₂ + (2 / 12)real(exp(2 * pi * t * im) * h3201) * ϵ^5 * β₂
+  + real(exp(4 * pi * t * im) * h2000) * ϵ^2 + real(h1100) * ϵ^2
+  + (2 / 6)real(exp(6 * pi * t * im) * h3000) * ϵ^3 + real(exp(2 * pi * t * im) * h2100) * ϵ^3
+  + (2 / 24)real(exp(8 * pi * t * im) * h4000) * ϵ^4 + (2 / 6)real(exp(4 * pi * t * im) * h3100) * ϵ^4 + (1 / 4) * real(h2200) * ϵ^4
+  + (2 / 120)real(exp(10 * pi * t * im) * h5000) * ϵ^5 + (2 / 24)real(exp(6 * pi * t * im) * h4100) * ϵ^5 + (2 / 12)real(exp(2 * pi * t * im) * h3200) * ϵ^5
+  + (2 / 720)real(exp(12 * pi * t * im) * h6000) * ϵ^6 + (2 / 120)real(exp(8 * pi * t * im) * h5100) * ϵ^6 + (2 / 48)real(exp(4 * pi * t * im) * h4200) * ϵ^6 + (1 / 36)real(h3300) * ϵ^6
+  + (2 / 5040)real(exp(14 * pi * t * im) * h7000) * ϵ^7 + (2 / 720)real(exp(10 * pi * t * im) * h6100) * ϵ^7 + (2 / 240)real(exp(6 * pi * t * im) * h5200) * ϵ^7 + (2 / 144)real(exp(2 * pi * t * im) * h4300) * ϵ^7) for t ∈ t] 
   #pars = genh.parameters - 2real(c₂) * K01 * ϵ^2 + (real(c₂) * K10 + (4a3201 * real(c₂) - 3 * real(c₃)) * K01 + 2 * (real(c₂))^2 * K02) * ϵ^4 + (2(real(c₃) - a3201 * real(c₂)) * K10 - 2 * (real(c₂))^2 * K11 - 2real(c₂) * (4 * a3201 * real(c₂) - 3 * real(c₃)) * K02 - (8 / 6) * (real(c₂))^3 * K03) * ϵ^6
   pars = genh.parameters + K10 * β₁ + K01 * β₂ + (1/2) * K02 * β₂^2 + K11 * β₁ * β₂ + (1/6) * K03 * β₂^3
   T = 2pi / (abs(genh.ω) + (imag(c₁) - 2real(c₂) * b101) * ϵ^2 + (real(c₂) * b110 + (4a3201 * real(c₂) - 3 * real(c₃)) * b101 + 2 * (real(c₂))^2 * b102 - 2real(c₂) * b201 + imag(c₂)) * ϵ^4)
   psol(profile, pars, collect(t), T, ncol, nothing, nothing)
 end
+
+
 
