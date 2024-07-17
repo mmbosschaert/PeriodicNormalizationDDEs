@@ -10,6 +10,29 @@ struct psol_ns{T}
     omega::T
 end
 
+Base.show(io::IO, ns1::psol_ns) = begin
+  println(io, "Profile: $(ns1.profile)")
+  println(io, "Eigenvector: $(ns1.eigenvector)")
+  println(io, "Parameters: $(ns1.parameters)")
+  println(io, "Mesh: $(ns1.mesh)")
+  println(io, "Period: $(ns1.period)")
+  println(io, "Number of collocation points: $(ns1.ncol)")
+  if ns1.stability === nothing
+    println(io, "Stability: not calculated")
+  else
+    # eigenvalues = sort(ns1.stability; by=x -> (floor(real(x); digits=6), -floor(imag(x); digits=6)), rev=true)
+    println(io, "Stability:")
+    display(ns1.stability)
+  end
+  if ns1.nmfm === nothing
+    println(io, "Normal form: not calculated")
+  else
+    println(io, "Normal form:")
+    println(io, ns1.nmfm)
+  end
+  println(io, "ω: $(ns1.omega)")
+end
+
 function psol_to_ns(ns_guess)
     # find frequency
     indx = findmin(abs.(abs.(ns_guess.stability) .- 1.0))
@@ -374,7 +397,7 @@ function ns_res_jac(jet,periodicsolution,periodicsolution_res,τs)
         # 2. (1/A - 2 c2^2) C ± √(1/A - c2^2) c2 B == 0
         #
         #
-        # Now solven this ...
+        # Now solve this ...
         #
         # Let c1^2 = 1/∫ <u,u> + <v,v> dτ - c2^2
         # i.e. c1 = ± √ (1/∫ <u,u> + <v,v> dτ - c2^2)
@@ -585,7 +608,7 @@ function SetupNSBranch(jet,ns_guess,τs; parameterbounds=nothing, δ=.001, δmin
     ns_branch
 end
 
-function SetupNSBranch(jet, hoho, ϵ₁, ϵ₂, ntst, ncol,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250,
+function SetupNSBranch(jet, hoho, ϵ₁, ϵ₂, ntst, ncol,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=[0.01; 0.01], MaxNumberofSteps = [250; 250],
     NumberOfFails = 4, amplification_factor = 1.1)
 
     # obtain dimension of the system
@@ -624,35 +647,49 @@ function SetupNSBranch(jet, hoho, ϵ₁, ϵ₂, ntst, ncol,τs; parameterbounds=
             psol_prev,τs)
 
     # construct Neimark-Sacker branches
-    ns_branchI = (points = psol_ns[], tangents = [], stepsizes = [], 
+    ns_branch = [(points = psol_ns[], tangents = [], stepsizes = [], 
         f = f, df = df,
         parameterbounds=parameterbounds,
         δ=δ,
         δmin=δmin,
-        δmax=δmax,
-        MaxNumberofSteps = MaxNumberofSteps,
+        δmax=δmax[i],
+        MaxNumberofSteps = MaxNumberofSteps[i],
         con_par = nothing,
         NumberOfFails = NumberOfFails
-    )
-    ns_branchII = deepcopy(ns_branchI)
-    ns_branch = (ns_branchI, ns_branchII)
+    ) for i in 1:2]
 
     for ϵ ∈ vcat(1, amplification_factor)
       # obtain Neimark-Sacker guesses
+
+      # Main.@infiltrate
+      #
+      # ϵ₁ = 0.01
+
       ns_guess = doubleHopfToNS(jet, hoho, ϵ*ϵ₁, ϵ*ϵ₂, ntst, ncol, τs)
 
+      # norm(f(x₀[1], ns_guess[1]))
+
+      # # convert ns_guess vector to psol_ns
+
+      # ns_guess[1].profile .= [c for c in eachcol(reverse(hcat(ns_guess[1].profile...),dims=1))]
+
+      # Main.lines(hcat(ns_branch.ns_guess[1].profile...))
+
       # convert to vector for Newton
-      x₀ = [vec(ns_guess[i],nothing) for i in 1:2]
+      x₀ = [vec(ns,nothing) for ns in ns_guess]
+      ns_corrected = x₀
 
       # solve with newton
       for i=1:2
         jac = df(x₀[i], ns_guess[i])
         V = [jac[1:end-1,:]; rand(length(x₀[i]))']\[zeros(length(x₀[i])-1); 1.0]
+        V = V/norm(V)
         x₀new, _, V_new, convergend = newton(f, df, x₀[i], V, ns_guess[i]; tol=1e-8)
         @show convergend
         # convert ns_guess vector to psol_ns
-        ns_corrected = [vec_to_point(x₀new, ns_guess[i], nothing) for i in 1:2]
-        push!(ns_branch[i].points, ns_corrected[i])
+        # ns_corrected = [vec_to_point(x₀new, ns_guess[i], nothing) for i in 1:2]
+        ns_corrected = vec_to_point(x₀new, ns_guess[i], nothing)
+        push!(ns_branch[i].points, ns_corrected)
         push!(ns_branch[i].tangents, V_new)
         push!(ns_branch[i].stepsizes, 0.0)
       end
