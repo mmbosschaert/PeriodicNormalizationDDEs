@@ -263,3 +263,34 @@ function normalform(jet, hoho::DoubleHopf, τs)
 end
 
 
+function determine_unfolding_case(double_hopf_points)
+  for (i, hoho) in enumerate(double_hopf_points)
+    println("\033[1m======== Double Hopf point $i ========\033[0m")
+    if real(hoho.nmfm.g2100) * real(hoho.nmfm.g0021) > 0
+      print("\033[1m======== Simple case: ")
+      if hoho.nmfm.δ > 0 && hoho.nmfm.θ > 0 && hoho.nmfm.θ * hoho.nmfm.δ > 1
+        print("I")
+      elseif hoho.nmfm.δ > 0 && hoho.nmfm.θ > 0 && hoho.nmfm.θ * hoho.nmfm.δ < 1
+        print("II")
+      elseif hoho.nmfm.δ > 0 && hoho.nmfm.θ < 0
+        print("III")
+      elseif hoho.nmfm.δ < 0 && hoho.nmfm.θ < 0 && hoho.nmfm.θ * hoho.nmfm.δ < 1
+        print("IV")
+      else
+        print("VI")
+      end
+      println(" ========\033[0m")
+      # if hoho.nmfm.θ < hoho.nmfm.δ
+      #   println("Need to change sub-indices in the amplitiude equations")
+      # end
+      if real(hoho.nmfm.g2100) > 0 && real(hoho.nmfm.g0021) > 0
+        println("\033[31mTime-reversal needed\033[0m")
+      end
+      @show hoho.parameters
+      @show hoho.nmfm.δ
+      @show hoho.nmfm.θ
+    else
+      println("Difficult case: periodic orbits in the amplitude equations")
+    end
+  end
+end

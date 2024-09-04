@@ -15,9 +15,15 @@ function stability(M, points, τs; neigs=13, maxit=100)
   end
 end
 
-function stability(jet::NamedTuple, p, τs; neigs=13, maxit=100)
+function stability(jet::NamedTuple, p, τs; neigs=13, maxit=100, σ=nothing)
   dep = DEP(jet.Ms(repeat(p.coords, 1, length(τs)), p.parameters), vec(τs))
-  λ, _ = iar_chebyshev(dep, maxit=maxit, neigs=neigs)
+  if σ === nothing
+    λ, _ = iar_chebyshev(dep, maxit=maxit, neigs=neigs)
+  else
+    println("Using σ")
+    λ, _ = iar_chebyshev(dep, maxit=maxit, neigs=neigs, σ=σ)
+  end
+
   @set p.stability = λ
 end
 
