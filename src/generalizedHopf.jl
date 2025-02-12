@@ -117,6 +117,7 @@ Base.show(io::IO, nf::GenHopfNormalformHigherOrder) = begin
   println(io, "K01: $(nf.K01)")
   println(io, "K02: $(nf.K02)")
   println(io, "K11: $(nf.K11)")
+  println(io, "K03: $(nf.K03)")
   println(io, "c₁: $(nf.c₁)")
   println(io, "c₂: $(nf.c₂)")
   println(io, "ℓ₁: $(nf.ℓ₁)")
@@ -350,8 +351,8 @@ function normalform_beta(jet, hopf::GenHopf, τs)
   p /= transpose(p) * (Δ′(λ) * q)
 
   # define border inverse of characteristic matrix
-  Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [q' 0]]\[y; 0])[1:end-1]
-
+  #Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [q' 0]]\[y; 0])[1:end-1]
+  Δᴵᴺⱽ(λ, y) = ([Δ(λ) q; [transpose(p) 0]]\[y; 0])[1:end-1]
   function Aᴵᴺⱽ(λ, η, κ)
     ξ = Δᴵᴺⱽ(λ, η + κ * Δ′(λ) * q)
     γ = first(transpose(p) * (-Δ′(λ) * ξ + 0.5 * κ * Δ′′(λ) * q))
@@ -576,11 +577,11 @@ function normalform_beta(jet, hopf::GenHopf, τs)
                                           + B(h2000, conj ∘ Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2B(h1100, Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2B₁(ϕ, h1100, e₂) + B₁(conj ∘ ϕ, h2000, e₂)
                                           + C(ϕ, ϕ, conj ∘ Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2C(ϕ, conj ∘ ϕ, Aᴵᴺⱽ(λ, Γ₂(ϕ), 0)) + 2C(ϕ, h1100, (θ -> Δ(0) \ (J₁ * e₂)))
                                           + C(conj ∘ ϕ, h2000, (θ -> Δ(0) \ (J₁ * e₂))) + C₁(ϕ, ϕ, conj ∘ ϕ, e₂) + D(ϕ, ϕ, conj ∘ ϕ, (θ -> Δ(0) \ (J₁ * e₂))))
-  ))) + imag(first(transpose(p) * Γ₂(ϕ))) * 0.5 * rP2
+  ))+ imag(first(transpose(p) * Γ₂(ϕ))) * 0.5 * rP2)
 
   P = [P11 P12; P21 P22]
 
-  Q210 = 0.5 * real(first(transpose(p) * (4B(ϕ, (θ -> ((Δ(0) \ (Δ′(0) - θ * Δ(0))) * h1100(θ) - (Δ(0) \ real(B(conj ∘ ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1)))))))
+  Q210 = 0.5 * real(first(transpose(p) * (4B(ϕ, (θ -> ((Δ(0) \ (Δ′(0) - θ * Δ(0))) * h1100(θ) + (Δ(0) \ real(B(conj ∘ ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1)))))))
                                           + 2 * B(conj ∘ ϕ, (θ -> ((Δ(2λ) \ (Δ′(2λ) - θ * Δ(2λ))) * h2000(θ) + (exp(2.0 * λ * θ) * (Δ(2.0 * λ) \ B(ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1)))))))
                                           + B(h2000, conj ∘ Aᴵᴺⱽ(λ, zeros(length(q)), 1)) + 2 * B(h1100, Aᴵᴺⱽ(λ, zeros(length(q)), 1)) + C(ϕ, ϕ, conj ∘ Aᴵᴺⱽ(λ, zeros(length(q)), 1))
                                           + 2 * C(ϕ, conj ∘ ϕ, Aᴵᴺⱽ(λ, zeros(length(q)), 1))
@@ -606,13 +607,13 @@ function normalform_beta(jet, hopf::GenHopf, τs)
   h1110(θ) = Δ(0.0) \ (A₁(h1100, K10) + 2real(B(conj ∘ ϕ, h1010)) + B(h1100, h0010) + B₁(ϕ, conj ∘ ϕ, K10) + C(ϕ, conj ∘ ϕ, h0010)) - 2 * (Δ(0.0) \ (Δ′(0.0) - θ * Δ(0.0))) * h1100(θ)
   h1101(_) = Δ(0.0) \ (A₁(h1100, K01) + 2real(B(conj ∘ ϕ, h1001)) + B(h1100, h0001) + B₁(ϕ, conj ∘ ϕ, K01) + C(ϕ, conj ∘ ϕ, h0001))
 
-  M2101 = (A₁(h2100, K10) + B(conj ∘ ϕ, h2010) + 2B(ϕ, h1110) + B(h2100, h0010) + B(h2000, conj ∘ h1010)
-           + 2B(h1100, h1010) + B₁(h2000, conj ∘ ϕ, K10) + 2B₁(ϕ, h1100, K10) + 2C(ϕ, conj ∘ ϕ, h1010)
-           + C(h2000, conj ∘ ϕ, h0010) + C(ϕ, ϕ, conj ∘ h1010) + 2C(ϕ, h1100, h0010) + C₁(ϕ, ϕ, conj ∘ ϕ, K10) + D(ϕ, ϕ, conj ∘ ϕ, h0010))
-
-  M2110 = (A₁(h2100, K01) + B(conj ∘ ϕ, h2001) + 2B(ϕ, h1101) + B(h2100, h0001) + B(h2000, conj ∘ h1001)
+  M2101 = (A₁(h2100, K01) + B(conj ∘ ϕ, h2001) + 2B(ϕ, h1101) + B(h2100, h0001) + B(h2000, conj ∘ h1001)
            + 2B(h1100, h1001) + B₁(h2000, conj ∘ ϕ, K01) + 2B₁(ϕ, h1100, K01) + 2C(ϕ, conj ∘ ϕ, h1001)
            + C(h2000, conj ∘ ϕ, h0001) + C(ϕ, ϕ, conj ∘ h1001) + 2C(ϕ, h1100, h0001) + C₁(ϕ, ϕ, conj ∘ ϕ, K01) + D(ϕ, ϕ, conj ∘ ϕ, h0001))
+
+  M2110 = (A₁(h2100, K10) + B(conj ∘ ϕ, h2010) + 2B(ϕ, h1110) + B(h2100, h0010) + B(h2000, conj ∘ h1010)
+           + 2B(h1100, h1010) + B₁(h2000, conj ∘ ϕ, K10) + 2B₁(ϕ, h1100, K10) + 2C(ϕ, conj ∘ ϕ, h1010)
+           + C(h2000, conj ∘ ϕ, h0010) + C(ϕ, ϕ, conj ∘ h1010) + 2C(ϕ, h1100, h0010) + C₁(ϕ, ϕ, conj ∘ ϕ, K10) + D(ϕ, ϕ, conj ∘ ϕ, h0010))
 
   b201 = 0.5 * imag(first(transpose(p) * (M2101)))
   b210 = 0.5 * imag(first(transpose(p) * (M2110)))
@@ -775,7 +776,6 @@ function normalform_beta(jet, hopf::GenHopf, τs)
 
   h0002(_) = Δ(0) \ (J₁ * K02 + M0002)
   b102 = imag(first(transpose(p) * (A₁(ϕ, K02) + B(ϕ, h0002) + M1002)))
-
 
   h1002(θ) = Aᴵᴺⱽ(λ, A₁(ϕ, K02) + B(ϕ, h0002) + M1002, -im * b102)(θ) - 2 * im * b101 * A2ᴵᴺⱽ(λ, h1001(0), -im * b101)(θ)
 
@@ -1048,12 +1048,12 @@ function generalizedHopfToPsol(jet, genh, ϵ, ntst, ncol, τs)
   c₂ = genh.nmfm.c₂
   ω₂ = genh.nmfm.ω₂
 
-  α = real([γ110 γ101; γ210 γ201]) \ [0.0; -2real(c₂)]
+  α = real([γ110 γ101; γ210 γ201]) \ [0.0; -2real(c₂ ) * ϵ^2]
 
   # construct initial guess
   t = range(0.0, 1.0, ntst * ncol + 1)
   profile = [2 * real(exp(2 * pi * t * im) * q) * ϵ + (real(h1100) + h0010 * α[1] + h0001 * α[2] + real(exp(4 * pi * t * im) * h2000)) * ϵ^2 for t ∈ t]
-  pars = genh.parameters + α * ϵ^2
+  pars = genh.parameters + α 
   T = 2pi / (abs(genh.ω) + (imag(c₁) - 2real(c₂) * ω₂) * ϵ^2)
   psol(profile, pars, collect(t), T, ncol, nothing, nothing)
 end
@@ -1122,27 +1122,29 @@ function generalizedHopfToPsolHigherOrder(jet, genh, ϵ, ntst, ncol, τs)
   #approximmations of the parameters
   β₁ = real(c₂) * ϵ^4 + 2(real(c₃) - a3201 * real(c₂)) * ϵ^6
   β₂ = -2real(c₂) * ϵ^2 + (4a3201 * real(c₂) - 3 * real(c₃)) * ϵ^4
-  β₂₂ = 4 * (real(c₂))^2 * ϵ^4 - 4real(c₂) * (4 * a3201 * real(c₂) - 3 * real(c₃)) * ϵ^6  #\beta_2^2
-  β₁₂ = -2 * (real(c₂))^2 * ϵ^6       #\beta_1 * \beta_2
-  β₂₂₂ = -8 * (real(c₂))^3 * ϵ^6 #\beta_2^3
+  
 
   # construct initial guess
   t = range(0.0, 1.0, ntst * ncol + 1)
-  profile = [(2 * real(exp(2 * pi * t * im) * q) * ϵ + h0010 * β₁ + h0001 * β₂ + (1 / 2) * β₂₂ * h0002 + β₁₂ * h0011 + (1 / 6) * h0003 * β₂₂₂
-              + 2real(exp(2 * pi * t * im) * h1010) * ϵ * β₁ + real(exp(4 * pi * t * im) * h2010) * ϵ^2 * β₁ + real(h1110) * ϵ^2 * β₁
-              + 2real(exp(2 * pi * t * im) * h1002) * ϵ * β₂₂ * (1 / 2) + real(exp(4 * pi * t * im) * h2002) * β₂₂ * (1 / 2) + real(h1102) * β₂₂ * (1 / 2)
-              + 2real(exp(2 * pi * t * im) * h1011) * ϵ * β₁₂ + 2real(exp(2 * pi * t * im) * h1003) * ϵ * β₂₂₂ * (1 / 6)
-              + 2real(exp(2 * pi * t * im) * h1001) * ϵ * β₂ + real(exp(4 * pi * t * im) * h2001) * ϵ^2 * (1 / 2) * β₂₂
-              + real(h1101) * ϵ^2 * β₂ + (2 / 6)real(exp(6 * pi * t * im) * h3001) * ϵ^3 * β₂ + real(exp(2 * pi * t * im) * h2101) * ϵ^3 * (1 / 2) * β₂
-              + (2 / 24)real(exp(8 * pi * t * im) * h4001) * ϵ^4 * β₂ + (2 / 6)real(exp(4 * pi * t * im) * h3101) * ϵ^4 * β₂ + (1 / 4) * real(h2201) * ϵ^4 * β₂
-              + (2 / 120)real(exp(10 * pi * t * im) * h5001) * ϵ^5 * β₂ + (2 / 24)real(exp(6 * pi * t * im) * h4101) * ϵ^5 * β₂ + (2 / 12)real(exp(2 * pi * t * im) * h3201) * ϵ^5 * β₂
-              + real(exp(4 * pi * t * im) * h2000) * ϵ^2 + real(h1100) * ϵ^2
-              + (2 / 6)real(exp(6 * pi * t * im) * h3000) * ϵ^3 + real(exp(2 * pi * t * im) * h2100) * ϵ^3
-              + (2 / 24)real(exp(8 * pi * t * im) * h4000) * ϵ^4 + (2 / 6)real(exp(4 * pi * t * im) * h3100) * ϵ^4 + (1 / 4) * real(h2200) * ϵ^4
-              + (2 / 120)real(exp(10 * pi * t * im) * h5000) * ϵ^5 + (2 / 24)real(exp(6 * pi * t * im) * h4100) * ϵ^5 + (2 / 12)real(exp(4 * pi * t * im) * h3200) * ϵ^5
-              + (2 / 720)real(exp(12 * pi * t * im) * h6000) * ϵ^6 + (2 / 120)real(exp(8 * pi * t * im) * h5100) * ϵ^6 + (2 / 48)real(exp(4 * pi * t * im) * h4200) * ϵ^6 + (1 / 36)real(h3300) * ϵ^6
-              + (2 / 5040)real(exp(14 * pi * t * im) * h7000) * ϵ^7 + (2 / 720)real(exp(10 * pi * t * im) * h6100) * ϵ^7 + (2 / 240)real(exp(6 * pi * t * im) * h5200) * ϵ^7 + (2 / 144)real(exp(2 * pi * t * im) * h4300) * ϵ^7) for t ∈ t]
-  pars = genh.parameters - 2real(c₂) * K01 * ϵ^2 + (real(c₂) * K10 + (4a3201 * real(c₂) - 3 * real(c₃)) * K01 + 2 * (real(c₂))^2 * K02) * ϵ^4 + (2(real(c₃) - a3201 * real(c₂)) * K10 - 2 * (real(c₂))^2 * K11 - 2real(c₂) * (4 * a3201 * real(c₂) - 3 * real(c₃)) * K02 - (8 / 6) * (real(c₂))^3 * K03) * ϵ^6
+  profile = profile = [(2 * real(exp(2 * pi * t * im) * q) * ϵ + h0010 * β₁ + h0001 * β₂ + (1 / 2) * β₂^2 * h0002 + β₁ * β₂ * h0011 + (1 / 6) * h0003 * β₂^3 
+  + 2real(exp(2 * pi * t * im) * h1010) * ϵ * β₁ + real(exp(4 * pi * t * im) * h2010) * ϵ^2 * β₁ + real(h1110) * ϵ^2 * β₁
+  + 2real(exp(2 * pi * t * im) * h1002) * ϵ * β₂^2 * (1 / 2) + real(exp(4 * pi * t * im) * h2002) * ϵ^2 * β₂^2 * (1 / 2) + real(h1102) * ϵ^2 * β₂^2 * (1 / 2)
+  + 2real(exp(2 * pi * t * im) * h1011) * ϵ *  β₁ * β₂ + 2real(exp(2 * pi * t * im) * h1003) * ϵ * β₂^3  * (1 / 6)
+  + 2real(exp(2 * pi * t * im) * h1001) * ϵ * β₂ + real(exp(4 * pi * t * im) * h2001) * ϵ^2 * β₂
+  + real(h1101) * ϵ^2 * β₂ + (2 / 6)real(exp(6 * pi * t * im) * h3001) * ϵ^3 * β₂ + real(exp(2 * pi * t * im) * h2101) * ϵ^3 * β₂
+  + (2 / 24)real(exp(8 * pi * t * im) * h4001) * ϵ^4 * β₂ + (2 / 6)real(exp(4 * pi * t * im) * h3101) * ϵ^4 * β₂ + (1 / 4) * real(h2201) * ϵ^4 * β₂
+  + (2 / 120)real(exp(10 * pi * t * im) * h5001) * ϵ^5 * β₂ + (2 / 24)real(exp(6 * pi * t * im) * h4101) * ϵ^5 * β₂ + (2 / 12)real(exp(2 * pi * t * im) * h3201) * ϵ^5 * β₂
+  + real(exp(4 * pi * t * im) * h2000) * ϵ^2 + real(h1100) * ϵ^2
+  + (2 / 6)real(exp(6 * pi * t * im) * h3000) * ϵ^3 + real(exp(2 * pi * t * im) * h2100) * ϵ^3
+  + (2 / 24)real(exp(8 * pi * t * im) * h4000) * ϵ^4 + (2 / 6)real(exp(4 * pi * t * im) * h3100) * ϵ^4 + (1 / 4) * real(h2200) * ϵ^4
+  + (2 / 120)real(exp(10 * pi * t * im) * h5000) * ϵ^5 + (2 / 24)real(exp(6 * pi * t * im) * h4100) * ϵ^5 + (2 / 12)real(exp(2 * pi * t * im) * h3200) * ϵ^5
+  + (2 / 720)real(exp(12 * pi * t * im) * h6000) * ϵ^6 + (2 / 120)real(exp(8 * pi * t * im) * h5100) * ϵ^6 + (2 / 48)real(exp(4 * pi * t * im) * h4200) * ϵ^6 + (1 / 36)real(h3300) * ϵ^6
+  + (2 / 5040)real(exp(14 * pi * t * im) * h7000) * ϵ^7 + (2 / 720)real(exp(10 * pi * t * im) * h6100) * ϵ^7 + (2 / 240)real(exp(6 * pi * t * im) * h5200) * ϵ^7 + (2 / 144)real(exp(2 * pi * t * im) * h4300) * ϵ^7) for t ∈ t] 
+  #pars = genh.parameters - 2real(c₂) * K01 * ϵ^2 + (real(c₂) * K10 + (4a3201 * real(c₂) - 3 * real(c₃)) * K01 + 2 * (real(c₂))^2 * K02) * ϵ^4 + (2(real(c₃) - a3201 * real(c₂)) * K10 - 2 * (real(c₂))^2 * K11 - 2real(c₂) * (4 * a3201 * real(c₂) - 3 * real(c₃)) * K02 - (8 / 6) * (real(c₂))^3 * K03) * ϵ^6
+  pars = genh.parameters + K10 * β₁ + K01 * β₂ + (1/2) * K02 * β₂^2 + K11 * β₁ * β₂ + (1/6) * K03 * β₂^3
   T = 2pi / (abs(genh.ω) + (imag(c₁) - 2real(c₂) * b101) * ϵ^2 + (real(c₂) * b110 + (4a3201 * real(c₂) - 3 * real(c₃)) * b101 + 2 * (real(c₂))^2 * b102 - 2real(c₂) * b201 + imag(c₂)) * ϵ^4)
   psol(profile, pars, collect(t), T, ncol, nothing, nothing)
 end
+
+
+
