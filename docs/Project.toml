@@ -1,0 +1,7 @@
+[deps]
+Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
+DDEBifTool = "db37f8d4-3181-4d44-9749-67462466d3c5"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+JSServe = "824d6782-a2ef-11e9-3a09-e5662e0c26f9"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+Observables = "510215fc-4207-5dde-b226-833fc4488ee2"

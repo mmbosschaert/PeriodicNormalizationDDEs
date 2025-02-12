@@ -5,6 +5,10 @@ struct stst
 end
 stst(coords, parameters) = stst(coords, parameters, nothing)
 
+# ANSI escape sequences for bold formatting
+const BOLD = "\e[1m"
+const RESET = "\e[0m"
+
 # Define custom show function for DoubleHopf
 Base.show(io::IO, stst1::stst) = begin
   println(io, "Coordinates: $(stst1.coords)")
@@ -45,7 +49,7 @@ function SetupStstBranch(model, con_par, eq, params, τs, dims; parameterbounds=
   v₀ = [df(x₀, x₀); rand(dims + 1)'] \ [zeros(dims); 1.0]
   v₀ /= norm(v₀)
 
-  stst_branch = (points=stst[],
+  stst_branch = Branch(points=stst[],
     tangents=[],
     stepsizes=[],
     f=f,
@@ -56,7 +60,8 @@ function SetupStstBranch(model, con_par, eq, params, τs, dims; parameterbounds=
     δmax=δmax,
     MaxNumberofSteps=MaxNumberofSteps,
     con_par=con_par,
-    NumberOfFails=NumberOfFails)
+    NumberOfFails=NumberOfFails,
+    specialpoints = nothing)
   push!(stst_branch.points, stst1)
   push!(stst_branch.tangents, v₀)
   push!(stst_branch.stepsizes, 0.0)
@@ -98,7 +103,7 @@ function LocateHopfPoints(jet, branch, τs)
 
     x₀ = vcat([hopf.coords, hopf.parameters[con_par], real(hopf.v), imag(hopf.v), hopf.ω]...)
 
-    x₁, _ = DDEBifTool.newton(f, Df, x₀, x₀, tol=1e-14)
+    x₁, _ = newton(f, Df, x₀, x₀, tol=1e-14)
     hopf = Hopf(x₁[1:n], [params[1:con_par-1]; x₁[n+1]; params[con_par+1:end]], x₁[n+2:2n+1] + x₁[2n+2:3n+1] * im, x₁[end], nothing, nothing)
     push!(hopf_points, hopf)
   end

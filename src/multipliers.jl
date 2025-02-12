@@ -72,7 +72,7 @@ function multipliers(jet, point, τs)
     @set point.stability = vals 
 end
 
-function multipliers!(jet, branch::NamedTuple, τs)
+function multipliers!(jet, branch::Branch, τs)
     for (i,p) in enumerate(branch.points)
         branch.points[i] = multipliers(jet,p,τs)
     end

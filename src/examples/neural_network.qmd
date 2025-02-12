@@ -13,17 +13,107 @@ Markdown is an easy to read and write text format:
 
 ## Code Cell
 
-Here is a Python code cell:
+Here is a Julia code cell:
 
-```{python}
-import os
-os.cpu_count()
+```{julia}
+using Revise
+using PeriodicNormalizationDDEs
+using PeriodicNormalizationDDEs:getJet
+using LinearAlgebra
+using SparseArrays
+using Symbolics
+using Setfield
+using Infiltrator
+using DifferentialEquations
+using JLD
+using CairoMakie
 ```
 
 ## Equation
 
 Use LaTeX to write equations:
 
-$$
-\chi' = \sum_{i=1}^n k_i s_i^2
-$$
+# Define constants and inline functions
+```{julia}
+const dims = 2
+const b = 2.0
+const d = 1.2
+const τ₁ = 11.6
+const τ₂ = 20.3
+τs = [0.0 τ₁ τ₂]
+@inline g(x) = (tanh(x - 1.0) + tanh(1.0)) * cosh(1.0)^2;
+```
+
+# Define model
+
+```{julia}
+function neuralMassModel(u, p)
+  a, c = p
+  x₁, x₂ = u[:, 1]
+  x₁τ₁, x₂τ₁ = u[:, 2]
+  x₁τ₂, x₂τ₂ = u[:, 3]
+  du = similar(u[:, 1])
+  du[1] = -x₁ - a * g(b * x₁τ₁) + c * g(d * x₂τ₂)
+  du[2] = -x₂ - a * g(b * x₂τ₁) + c * g(d * x₁τ₂)
+  du
+end
+
+function neuralMassModel!(du, u, h, p, t)
+  a, c = p
+  x₁, x₂ = u
+  x₁τ₁, x₂τ₁ = h(p, t - τ₁)
+  x₁τ₂, x₂τ₂ = h(p, t - τ₂)
+  du[1] = -x₁ - a * g(b * x₁τ₁) + c * g(d * x₂τ₂)
+  du[2] = -x₂ - a * g(b * x₂τ₁) + c * g(d * x₁τ₂)
+end
+
+
+# calculate multi-linear forms
+jet = getJet(neuralMassModel, dims, τs)
+
+## continue equilibria
+# create named tuple in order to avoid uing index for parameters access
+par_indx = (a=1, c=2)
+
+# select continuation parameter
+con_par = par_indx.c
+
+# parameters
+a = 0.069
+c = 0.4
+params = [a; c]
+
+# set parameter bounds
+parameterbounds = (min=[-0.1; -0.1], max=[1.2; 1.0])
+
+stst_branch = SetupStstBranch(neuralMassModel, con_par, zeros(dims), params, τs, dims; parameterbounds=parameterbounds, δmax=0.01)
+continue!(stst_branch)
+
+# calculate stability of the equilibria points
+stability(jet.Ms, stst_branch.points, τs)
+
+# Function used for plotting the parameters
+reverse_params(points) = reduce(hcat, [p.parameters[end:-1:1] for p in points])
+```
+
+```{julia}
+# inspect eigenvalues on stst branch
+fig = Figure(; fontsize=18)
+ax1 = Axis(fig[1, 1])
+ax2 = Axis(fig[1, 2])
+lines!(ax1, reverse_params(stst_branch.points))
+vlines!(ax2, [0.0], color=:red, linewidth=6)
+ax1.xlabel = "c"
+ax1.ylabel = "a"
+active_branch = stst_branch;
+slider = Slider(fig[2, 1:2], range=1:length(stst_branch.points))
+ind = Observable(1)
+connect!(ind, slider.value)
+pars = @lift active_branch.points[$ind].parameters[end:-1:1]
+scatter!(ax1, @lift(Point2f($pars)), markersize=20)
+λ = @lift active_branch.points[$ind].stability
+eigenvalues_stst = @lift(Point2f.(vec(real($λ)), vec(imag($λ))))
+scatter!(ax2, eigenvalues_stst)
+xlims!(ax1, (0.0, 1.2))
+ylims!(ax1, (-1.0, 1.0))
+```

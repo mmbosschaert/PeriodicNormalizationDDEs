@@ -10,9 +10,22 @@ struct PsolLPC{T}
     beta::T
 end
 
-# ANSI escape sequences for bold formatting
-const BOLD = "\e[1m"
-const RESET = "\e[0m"
+function Base.show(io::IO, br::Branch) 
+  println(io, BOLD, "points", RESET, ": ", length(br.points))
+  println(io, BOLD, "tangents", RESET, ": ", length(br.tangents))
+  println(io, BOLD, "stepsizes", RESET, ": ", length(br.stepsizes))
+  println(io, BOLD, "f", RESET, ": ", br.f)
+  println(io, BOLD, "df", RESET, ": ", br.df)
+  println(io, BOLD, "parameterbounds", RESET, ": ", br.parameterbounds)
+  println(io, BOLD, "δ", RESET, ": ", br.δ)
+  println(io, BOLD, "δmin", RESET, ": ", br.δmin)
+  println(io, BOLD, "δmax", RESET, ": ", br.δmax)
+  println(io, BOLD, "MaxNumberofSteps", RESET, ": ", br.MaxNumberofSteps)
+  println(io, BOLD, "con_par", RESET, ": ", br.con_par)
+  println(io, BOLD, "NumberOfFails", RESET, ": ", br.NumberOfFails)
+  println(io, BOLD, "specialpoints", RESET, ": ", br.specialpoints)
+end
+
 
 # Define custom show function for PsolLPC
 function Base.show(io::IO, p::PsolLPC{T}) where T
@@ -132,7 +145,7 @@ function vec_to_point(vec,p_prev::PsolLPC,_)
                     p_prev.ncol, nothing, nothing, vec[end])
 end
 
-function SetupLPCBranch(jet,fold_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, NumberOfFails = 4)
+function SetupLPCBranch(jet,fold_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, NumberOfFails = 4, con_par = nothing)
 
     v = fold_tangent(jet,fold_guess,τs);
     x₀ = [vcat(fold_guess.profile...); v[1:end-1]; fold_guess.parameters; fold_guess.period; v[end] ...]
@@ -180,15 +193,20 @@ function SetupLPCBranch(jet,fold_guess,τs; parameterbounds=nothing, δ=.001, δ
     fold_corrected = vec_to_point(x₀new, fold_guess,nothing)
 
     # continuation with own newton
-    lpc_branch = (points = PsolLPC[], tangents = [], stepsizes = [], 
-        f = f, df = df,
+    lpc_branch = Branch(
+        points = PsolLPC[],
+        tangents = [],
+        stepsizes = [], 
+        f = f,
+        df = df,
         parameterbounds=parameterbounds,
         δ=δ,
         δmin=δmin,
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
-        con_par = nothing,
-        NumberOfFails = NumberOfFails
+        con_par = con_par,
+        NumberOfFails = NumberOfFails,
+        specialpoints = []
     )
 
     push!(lpc_branch.points, fold_corrected)

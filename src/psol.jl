@@ -37,29 +37,32 @@ function vec(p::psol,con_par)
 end
 
 function vec_to_point(vec,point_prev::psol,con_par)
+    dims = length(point_prev.profile[1])
     psol(
-            [reshape(vec[1:end-2],2,:)[:,j] for j in 1:length(point_prev.mesh)], 
+            [reshape(vec[1:end-2],dims,:)[:,j] for j in 1:length(point_prev.mesh)], 
             [point_prev.parameters[1:con_par-1]; vec[end-1]; point_prev.parameters[con_par+1:end]], 
              point_prev.mesh, vec[end], point_prev.ncol, nothing, nothing)
 end
 
-function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, ntst = 20, ncol = 3, NumberOfFails = 4)
+function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, ntst = 20, ncol = 3, NumberOfFails = 4, ϵ = 1e-03)
 
     # define fine mesh
     t = range(0.0,1.0, ntst*ncol + 1)
-    profile = 1e-03*imag([hopf_point.v*s for s in exp.(im*2π*t)])
+    profile = ϵ*imag([hopf_point.v*s for s in exp.(im*2π*t)])
+    # shift profile to equilibrium
+    profile = [hopf_point.coords + p for p in profile]
     T = 2pi/abs(hopf_point.ω)
     psol_guess = psol(profile, hopf_point.parameters, collect(t), T, ncol, nothing, nothing)
-    psol_res(jet,psol_guess,psol_guess,τs)
+    # psol_res(jet,psol_guess,psol_guess,τs)
 
     f = (x,psol1) -> vcat([
         psol_res(jet,
-            psol([reshape(x[1:end-2],2,:)[:,j] for j in 1:length(psol1.mesh)],
+                 psol([reshape(x[1:end-2],length(psol1.profile[1]),:)[:,j] for j in 1:length(psol1.mesh)],
             [psol1.parameters[1:con_par-1]; x[end-1]; psol1.parameters[con_par+1:end]], psol1.mesh, x[end], 
                 psol1.ncol, nothing, nothing),psol1,τs)...; 0.0] ...)
 
     df = (x,psol1) -> defsystem_psol_jac(jet,
-            psol([reshape(x[1:end-2],2,:)[:,j] for j in 1:length(psol1.mesh)],
+            psol([reshape(x[1:end-2],length(psol1.profile[1]),:)[:,j] for j in 1:length(psol1.mesh)],
             [psol1.parameters[1:con_par-1]; x[end-1]; psol1.parameters[con_par+1:end]], psol1.mesh, x[end], 
                 psol1.ncol, nothing, nothing),psol1,τs)
 
@@ -67,13 +70,15 @@ function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=no
     jac = df(x₀,psol_guess)
     V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
 
-    x₀new, _, V_new = newton(f, df, x₀, V, psol_guess; tol=1e-8)
+    x₀new, _, V_new, converged = newton(f, df, x₀, V, psol_guess; tol=1e-8)
+    @show converged
     psol_corrected = vec_to_point(x₀new,psol_guess,con_par)
 
     # continuation with own newton
-    psol_branch = (points = psol[],
+    psol_branch = Branch(
+        points = psol[],
         tangents = [],
-        stepsizes = [],
+        stepsizes = Float64[],
         f = f,
         df = df,
         parameterbounds = parameterbounds,
@@ -82,7 +87,8 @@ function SetupPsolBranch(jet, con_par, hopf_point::Hopf, τs; parameterbounds=no
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
         con_par = con_par,
-        NumberOfFails = NumberOfFails)
+        NumberOfFails = NumberOfFails,
+        specialpoints = [])
     push!(psol_branch.points, psol_corrected)
     push!(psol_branch.tangents, V_new)
     push!(psol_branch.stepsizes, 0.0)
@@ -151,7 +157,8 @@ function SetupPsolBranch(jet, con_par, psol1::psol_pd, τs; parameterbounds=noth
     psol_corrected = vec_to_point(x₀new,psol_guess,con_par)
 
     # continuation with own newton
-    psol_branch = (points = psol[],
+    psol_branch = Branch(
+        points = psol[],
         tangents = [],
         stepsizes = [],
         f = f,
@@ -162,7 +169,8 @@ function SetupPsolBranch(jet, con_par, psol1::psol_pd, τs; parameterbounds=noth
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
         con_par = con_par,
-        NumberOfFails = NumberOfFails)
+        NumberOfFails = NumberOfFails,
+        specialpoints = [])
     push!(psol_branch.points, psol_corrected)
     push!(psol_branch.tangents, V_new)
     push!(psol_branch.stepsizes, 0.0)
@@ -366,16 +374,16 @@ end
 function detectSpecialPoints(branch)
     # detect NS bifurcations
     num_unstable = [sum(abs.(p.stability) .> 1.0) for p in branch.points]
-    indx_ns = findall(x->x==2,num_unstable[2:end] - num_unstable[1:end-1])
+    indx_ns = findall(x->abs(x)==2, abs.(diff(num_unstable)))
 
     # detect fold bifurcations
     num_unstable = [sum(abs.(p.stability) .> 1.0 .&& real(p.stability) .> 0.0) for p in branch.points]
-    indx_fold = findall(x->abs(x)==1,num_unstable[2:end] - num_unstable[1:end-1])
+    indx_fold = findall(x->abs(x)==1, abs.(diff(num_unstable)))
 
     # detect pd bifurcations
     num_unstable = [sum(abs.(p.stability) .> 1.0 .&& real(p.stability) .< 0.0) for p in branch.points]
-    indx_pd = findall(x->abs(x)==1,num_unstable[2:end] - num_unstable[1:end-1])
+    indx_pd = findall(x->abs(x)==1, abs.(diff(num_unstable)))
 
     specialpoints = (indx_fold = indx_fold, indx_pd  = indx_pd, indx_ns = indx_ns)
-    merge(branch, (specialpoints = specialpoints,))
+    @set branch.specialpoints = specialpoints
 end

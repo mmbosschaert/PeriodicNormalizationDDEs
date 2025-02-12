@@ -1,7 +1,6 @@
 # this function is not necessary anymore, see getJet
 function characteristic_matrices_unevaluated(model, n, τs)
 
-    # calculate derivatives at Bogdanov-Takens point
     jac = Symbolics.jacobian
     m = length(τs)
 
@@ -22,14 +21,13 @@ end
 
 function characteristic_matrices_unevaluated_re_im(model, n, τs)
 
-    # calculate derivatives at Bogdanov-Takens point
     jac = Symbolics.jacobian
     m = length(τs)
 
     # construct character matrix
-    @variables φ[1:n,1:m] α1 α2
+    @variables φ[1:n,1:m] α[1:2]
     φ = reshape(Symbolics.get_variables(φ), n, m) # cast into a Matrix of symbols
-    pars = [α1 α2]
+    pars = Symbolics.get_variables(α)
 
     @variables z
     Δre = Matrix(0.0*I,n,n)

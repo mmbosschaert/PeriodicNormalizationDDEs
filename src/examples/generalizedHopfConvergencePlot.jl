@@ -1,5 +1,6 @@
 using Revise
-using DDEBifTool
+using PeriodicNormalizationDDEs
+const PN = PeriodicNormalizationDDEs
 using GLMakie
 using LinearAlgebra
 using DataFrames
@@ -74,12 +75,12 @@ lines!(log10.(collect(δps1)), coeffs_second_order[1] .+ log10.(collect(δps1 .^
 
 # Create convergence plot for mixed order
 genh1 = point_to_genhopf(jet, stst1, τs)
-genh1 = DDEBifTool.normalform_beta(jet, genh1, τs)
+genh1 = PN.normalform_beta(jet, genh1, τs)
 
 δps2 = exp10.(LinRange(-1.2, -0.9, 20))
 relative_errors_higher_order = zeros(length(δps2))
 for (i, δp) in enumerate(δps2)
-  lpc_guess = DDEBifTool.generalizedHopfToPsolHigherOrder(jet, genh1, δp, ntst, ncol, τs)
+  lpc_guess = PN.generalizedHopfToPsolHigherOrder(jet, genh1, δp, ntst, ncol, τs)
   lpc_brI = SetupLPCBranch(jet, lpc_guess, τs)
   lpc_corrected = lpc_brI.points[1]
   relative_errors_higher_order[i] = norm([vcat(lpc_corrected.profile...); lpc_corrected.parameters; lpc_corrected.period] -

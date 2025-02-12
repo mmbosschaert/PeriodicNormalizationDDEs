@@ -1,4 +1,4 @@
-name = "DDEBifTool"
+name = "PeriodicNormalizationDDEs"
 uuid = "db37f8d4-3181-4d44-9749-67462466d3c5"
 authors = ["mmbosschaert <maikel.bosschaert@uhasselt.be>"]
 version = "0.1.0"
@@ -14,3 +14,6 @@ Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+
+[compat]
+Setfield = "1.1.1"

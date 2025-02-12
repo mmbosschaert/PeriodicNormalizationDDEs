@@ -1,4 +1,4 @@
-module DDEBifTool
+module PeriodicNormalizationDDEs
 
 import Base.vec
 import Base.*
@@ -75,6 +75,7 @@ export doubleHopfToPsol
 export generalizedHopfToPsol
 export LocateDoubleHopf
 export point_to_hopf
+export point_to_zeho
 
 using LinearAlgebra
 using Symbolics
@@ -85,9 +86,9 @@ using NLsolve
 using Setfield
 using SparseArrays
 using NaNMath
-# NaNMath.cos(x::Num) = cos(x)
-# NaNMath.sin(x::Num) = sin(x)
+using Setfield
 
+include("./branch.jl")
 include("./characteristic_matrix.jl")
 include("./characteristic_matrix_unevaluated.jl")
 include("./coefficient_matrices.jl")
@@ -98,7 +99,6 @@ include("./stst.jl")
 include("./hopf.jl")
 include("./newton.jl")
 include("./continuation.jl")
-include("./branch.jl")
 include("./stability.jl")
 include("./doubleHopf.jl")
 include("./zeroHopf.jl")
@@ -119,5 +119,37 @@ include("./generalizedHopf.jl")
 get_params(points) = hcat([p.parameters for p in points]...)
 # auxiliary function to extract normal form coefficients
 get_nmfm_coefficients(branch) = [p.nmfm for p in branch.points]
+
+# Function to find approximately equal vectors
+function find_approx_equal(points, threshold=1e-14)
+  n = length(points)
+  approx_equal_indices = []
+
+  for i in 1:n
+    for j in i+1:n
+      if norm(points[i].parameters - points[j].parameters) < threshold
+        push!(approx_equal_indices, (i, j))
+      end
+    end
+  end
+
+  return approx_equal_indices
+end
+
+function delete_one_from_approx_equal!(points, threshold=1e-8)
+  i = 1
+  while i <= length(points)
+    j = i + 1
+    while j <= length(points)
+      if norm(points[i].parameters - points[j].parameters) < threshold
+        deleteat!(points, j)  # Delete the second vector of the pair
+        break  # Exit the inner loop after deletion
+      else
+        j += 1
+      end
+    end
+    i += 1  # Increment i to check the next vector in the list
+  end
+end
 
 end # module

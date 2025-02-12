@@ -78,13 +78,13 @@ reverse_branch!(hopf_branchI)
 continue!(hopf_branchI)
 
 fig = Figure()
-ax = Axis(fig[1, 1], title = "FitzHugh-Nagumo model", xlabel = "β", ylabel = "α")
+ax = Axis(fig[1, 1], title="FitzHugh-Nagumo model", xlabel="β", ylabel="α")
 lines!(get_params(hopf_branchI.points), label="Hopf branch", color=Cycled(2))
 scatter!(get_params(lpc_brI.points[1:10:300]), label="Computed Limit point cycle branch")
 #lines!(hcat([params + K10 * β₁(ϵ) + K01 * β₂(ϵ) + 0.5K02 * β₂(ϵ)^2 + K11 * β₁(ϵ) * β₂(ϵ)  for ϵ in 0.001:0.001:0.07]...),
-       #label="Predicted Limit point cycle branch", color=Cycled(1))
-lines!(hcat([params  - 2real(c₂) * K01 * ϵ^2 + (real(c₂) * K10 + (4a3201 * real(c₂) - 3 * real(c₃)) * K01 + 2 * (real(c₂))^2 * K02) * ϵ^4 + (2(real(c₃) - a3201 * real(c₂)) * K10 - 2 * (real(c₂))^2 * K11 - 2real(c₂) * (4 * a3201 * real(c₂) - 3 * real(c₃)) * K02 - (8 / 6) * (real(c₂))^3 * K03) * ϵ^6 for ϵ in 0.001:0.001:0.07]...),
-       label="Predicted Limit point cycle branch", color=Cycled(1))
+#label="Predicted Limit point cycle branch", color=Cycled(1))
+lines!(hcat([params - 2real(c₂) * K01 * ϵ^2 + (real(c₂) * K10 + (4a3201 * real(c₂) - 3 * real(c₃)) * K01 + 2 * (real(c₂))^2 * K02) * ϵ^4 + (2(real(c₃) - a3201 * real(c₂)) * K10 - 2 * (real(c₂))^2 * K11 - 2real(c₂) * (4 * a3201 * real(c₂) - 3 * real(c₃)) * K02 - (8 / 6) * (real(c₂))^3 * K03) * ϵ^6 for ϵ in 0.001:0.001:0.07]...),
+  label="Predicted Limit point cycle branch", color=Cycled(1))
 scatter!([genh1.parameters[1]], [genh1.parameters[2]], color=:black, label="Generalized Hopf point", markersize=10)
 xlims!(ax, 1.89985, 1.90005)
 ylims!(ax, -1.06, -1.02)

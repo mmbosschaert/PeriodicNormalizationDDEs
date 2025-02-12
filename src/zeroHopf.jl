@@ -90,6 +90,10 @@ Base.show(io::IO, hopf::FoldHopf) = begin
   println(io, "Normal form: $(hopf.nmfm)")
 end
 
+function zeho_to_hopf(zeho)
+  Hopf(zeho.coords, zeho.parameters, zeho.v₂, zeho.ω₀)
+end
+
 function point_to_zeho(jet, p, τs)
   if p.stability === nothing
     println("Need to calculate stability")
@@ -124,7 +128,7 @@ function point_to_zeho(jet, p, τs)
 end
 
 # define border inverse of characteristic matrix
-function Δᴵᴺⱽ(λ, q, p, y, Δ) 
+function Δᴵᴺⱽ(λ, q, p, y, Δ)
   ([Δ(λ) q; [transpose(p) 0]]\[y; 0])[1:end-1]
 end
 function Aᴵᴺⱽ(λ, q, p, η, κ, Δ, Δ′, Δ′′)
@@ -218,8 +222,8 @@ function normalform(jet, zeho::FoldHopf, τs)
   r2(_) = Δᴵᴺⱽ(0.0, q0, p0, J1 * s2, Δ)
   r3(θ) = Δᴵᴺⱽ(0.0, q0, p0, (Δ′(0.0) * q0), Δ) - θ * q0
 
-  LL = [dot(p0, A1(ϕ0, s2)+B(ϕ0, r2)) transpose(p0)*B(ϕ0, ϕ0)
-        transpose(p1)*(A1(ϕ1, s2)+B(ϕ1, r2)) transpose(p1)*B(ϕ1, ϕ0)]
+  LL = [dot(p0, A1(ϕ0, s2) + B(ϕ0, r2)) transpose(p0)*B(ϕ0, ϕ0)
+    transpose(p1)*(A1(ϕ1, s2)+B(ϕ1, r2)) transpose(p1)*B(ϕ1, ϕ0)]
 
   RR = -[transpose(p0) * (A1(ϕ0, s1) + B(ϕ0, r1) - B(ϕ0, r3))
     transpose(p1) * (A1(ϕ1, s1) + B(ϕ1, r1) - B(ϕ1, r3))]
@@ -266,4 +270,157 @@ function normalform(jet, zeho::FoldHopf, τs)
   )
 
   zeho = @set zeho.nmfm = nmfm
+end
+
+# fucntion to create initial guess for Neimark-Sacker branches from double Hopf point
+function foldHopfToPsol(jet, zeho, ϵ₁, ntst, ncol, τs)
+  # extract normal form coefficients
+  q0 = zeho.nmfm.q0
+  q1 = zeho.nmfm.q1
+  g110 = zeho.nmfm.g110
+  g021 = zeho.nmfm.g021
+  g111 = real(zeho.nmfm.g111)
+  g200 = zeho.nmfm.g200
+  g011 = real(zeho.nmfm.g011)
+  ω₀ = zeho.nmfm.ω₀
+  ω₁ = zeho.nmfm.ω₁
+  ω₂ = zeho.nmfm.ω₂
+  h00001 = zeho.nmfm.h000μ[1](0)
+  h00010 = zeho.nmfm.h000μ[2](0)
+  h011 = real(zeho.nmfm.h011(0))
+  h020 = zeho.nmfm.h020(0)
+
+  t = range(0.0, 1.0, ntst * ncol + 1) # time mesh
+  β₁ = -g011
+  β₂ = (2 * (real(g110) - g200) * real(g021) + real(g110) * g111) / (2 * g200)
+  z0 = -(2 * real(g021) + g111) / (2 * g200)
+  # profile = [zeho.coords + 2 * real(exp(2 * pi * t * im) * q1) * ϵ₁ + (β₁ * h00010 + β₂ * h00001 + h011 + z0 * q0 + real(exp(4 * pi * t * im) * conj(h020))) * ϵ₁^2 for t ∈ t]
+  # second order works worse than first order, something is wrong with the second order predictor
+  profile = [zeho.coords + 2 * real(exp(2 * pi * t * im) * q1) * ϵ₁  for t ∈ t]
+
+  #     fig = Main.Figure()
+  #     ax1 = Main.Axis(fig[1, 1])
+  #     ax2 = Main.Axis(fig[1, 2])
+  #     ax3 = Main.Axis(fig[1, 3])
+  #     Main.lines!(ax1,[p[1] for p in profile])
+  #     Main.lines!(ax2,[p[2] for p in profile])
+  #     Main.lines!(ax3,[p[3] for p in profile])
+
+  pars = zeho.parameters + zeho.nmfm.K * [β₁; β₂] * ϵ₁^2
+  T = 2pi / (abs(ω₀) + (ω₁ * β₁ + ω₂ * β₂ + imag(g110) * z0 + imag(g021)) * ϵ₁^2)
+
+  psol_guess1 = psol(profile, pars, collect(t), T, ncol, nothing, nothing)
+  psol_guess1 = multipliers(jet, psol_guess1, τs)
+
+  psol_guess1
+end
+
+function foldHopfToNS(jet, zeho, ϵ₁, ntst, ncol, τs)
+  psol_guess = foldHopfToPsol(jet, zeho, ϵ₁, ntst, ncol, τs)
+  ns_guess = psol_to_ns(psol_guess)
+  ns_guess = ns_w_approx(jet, ns_guess, τs)
+  ns_guess
+end
+
+function SetupNSBranch(jet, zeho, ϵ₁, ntst, ncol,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250,
+    NumberOfFails = 4, amplification_factor = 1.1)
+
+    # obtain dimension of the system
+    dims = length(zeho.coords)
+
+    # create timemesh
+    t = collect(range(0.0,1.0, ntst*ncol + 1))
+
+    # define the residual and jacobian
+    f = (x,psol_prev) -> vcat(
+    [psol_ns_res(jet,
+            psol_ns(
+                [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                t, 
+                x[3*dims*(ntst*ncol+1)+3],
+                ncol, 
+                nothing,
+                nothing, 
+                x[3*dims*(ntst*ncol+1)+4]),
+            psol_prev,
+            τs); 0.0] ...)
+
+    df = (x,psol_prev) -> ns_res_jac(jet,
+            psol_ns(
+                [c[:] for c in eachcol(reshape(x[1:dims*(ntst*ncol+1)],dims,:))],
+                [c[:] for c in eachcol(reshape(x[dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)],2dims,:))],
+                x[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2],
+                t,
+                x[3*dims*(ntst*ncol+1)+3],
+                ncol, 
+                nothing,
+                nothing,
+                x[3*dims*(ntst*ncol+1)+4]),
+            psol_prev,τs)
+
+    # construct Neimark-Sacker branches
+    ns_branch = (points = psol_ns[], tangents = [], stepsizes = [], 
+        f = f, df = df,
+        parameterbounds=parameterbounds,
+        δ=δ,
+        δmin=δmin,
+        δmax=δmax,
+        MaxNumberofSteps = MaxNumberofSteps,
+        con_par = nothing,
+        NumberOfFails = NumberOfFails
+    )
+
+    for ϵ ∈ vcat(1, amplification_factor)
+      # obtain Neimark-Sacker guesses
+
+      ns_guess = foldHopfToNS(jet, zeho, ϵ*ϵ₁, ntst, ncol, τs)
+
+      # convert to vector for Newton
+      x₀ = vec(ns_guess,nothing)
+
+      # @show norm(f(x₀, ns_guess))
+      # solve with newton
+      jac = df(x₀, ns_guess)
+      # jac_df = Main.FiniteDiff.finite_difference_jacobian(x -> f(x, ns_guess), x₀)
+
+      # Main.@infiltrate
+
+      # @show (jac - jac_df)|> norm 
+      # jac[185,:]
+      # jac_df[185,:]
+      #
+      # Main.@infiltrate
+
+      # norm((x₀ - x₀new)[1:end-3])
+
+      V = [jac[1:end-1,:]; rand(length(x₀))']\[zeros(length(x₀)-1); 1.0]
+      V = V/norm(V)
+      x₀new, _, V_new, convergend = newton(f, df, x₀, V, ns_guess; tol=1e-8)
+      # @show x₀new
+      @show convergend
+      # convert ns_guess vector to psol_ns
+      # ns_corrected = [vec_to_point(x₀new, ns_guess, nothing) for i in 1:2]
+      ns_corrected = vec_to_point(x₀new, ns_guess, nothing)
+
+      push!(ns_branch.points, ns_corrected)
+      push!(ns_branch.tangents, V_new)
+      push!(ns_branch.stepsizes, 0.0)
+
+      # fig = Main.Figure()
+      # ax1 = Main.Axis(fig[1, 1])
+      # ax2 = Main.Axis(fig[1, 2])
+      # ax3 = Main.Axis(fig[1, 3])
+      # Main.lines!(ax1,[p[1] for p in ns_guess.profile])
+      # Main.lines!(ax1,[p[1] for p in ns_corrected.profile])
+      # Main.lines!(ax2,[p[2] for p in ns_guess.profile])
+      # Main.lines!(ax2,[p[2] for p in ns_corrected.profile])
+      # Main.lines!(ax3,[p[3] for p in ns_guess.profile])
+      # Main.lines!(ax3,[p[3] for p in ns_corrected.profile])
+
+    end
+
+    # retun branches
+    ns_branch
 end

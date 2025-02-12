@@ -1,5 +1,8 @@
+
 using Revise
-using DDEBifTool
+using PeriodicNormalizationDDEs
+using PeriodicNormalizationDDEs:getJet, LocateDoubleHopf, delete_one_from_approx_equal
+using PeriodicNormalizationDDEs:determine_unfolding_case
 using GLMakie
 using LinearAlgebra
 using SparseArrays
@@ -33,6 +36,7 @@ function neuralMassModel(u, p)
   du
 end
 
+# define model for simulation
 function neuralMassModel!(du, u, h, p, t)
   a, c = p
   x₁, x₂ = u
@@ -42,16 +46,17 @@ function neuralMassModel!(du, u, h, p, t)
   du[2] = -x₂ - a * g(b * x₂τ₁) + c * g(d * x₁τ₂)
 end
 
-τs = [0.0 τ₁ τ₂]
+# set delays
+τs = [0.0; τ₁; τ₂]
 
 # calculate multi-linear forms
-jet = DDEBifTool.getJet(neuralMassModel, dims, τs)
+jet = getJet(neuralMassModel, dims, τs)
 
 ## continue equilibria
 # parameter names to index
 par_indx = (a=1, c=2)
 
-# continuation parameter
+# continuation parameter for equilibria
 con_par = par_indx.c
 
 # parameters
@@ -71,13 +76,13 @@ stability(jet.Ms, stst_branch.points, τs)
 # Function to reverse and concatenate parameters
 reverse_params(p) = reduce(hcat, [p.parameters[end:-1:1] for p in p])
 
-# inspect eigenvalues on stst branch
-fig = Figure()
-set_theme!(theme_light())
+fig = Figure(; fontsize=18)
 ax1 = Axis(fig[1, 1])
 ax2 = Axis(fig[1, 2])
 lines!(ax1, reverse_params(stst_branch.points))
-lines!(ax2, hcat([zeros(100), range(-2.0, 2.0, 100)]...), color=:red, linewidth=6)
+vlines!(ax2, [0.0], color=:red, linewidth=6)
+ax1.xlabel = "c"
+ax1.ylabel = "a"
 active_branch = stst_branch;
 slider = Slider(fig[2, 1:2], range=1:length(stst_branch.points))
 ind = Observable(1)
@@ -135,7 +140,7 @@ double_hopf_points = []
 for hopf_branch in hopf_branches
   ind_double_hopf = locate_double_hopf(hopf_branch.points)
   for p in hopf_branch.points[ind_double_hopf]
-    p_corrected = DDEBifTool.LocateDoubleHopf(jet, p, τs; MaxIter=100, tol=1e-12)
+    p_corrected = LocateDoubleHopf(jet, p, τs; MaxIter=100, tol=1e-12)
     push!(double_hopf_points, p_corrected)
     # scatter!(ax1, [p_corrected.parameters[2]], [p_corrected.parameters[1]], color=:black)
     # put text near the double hopf point
@@ -144,7 +149,7 @@ for hopf_branch in hopf_branches
 end
 
 # remove duplicates
-DDEBifTool.delete_one_from_approx_equal!(double_hopf_points)
+delete_one_from_approx_equal!(double_hopf_points)
 
 # plot double hopf points
 for (i, p) in enumerate(double_hopf_points)
@@ -169,7 +174,7 @@ end
 # add normal form coefficients
 double_hopf_points = compute_nmfm_coefficients(double_hopf_points)
 
-DDEBifTool.determine_unfolding_case(double_hopf_points)
+determine_unfolding_case(double_hopf_points)
 
 # detect zero hopf points 
 ind_zero_hopf1 = locate_zero_hopf(hopf_branches[1].points)
@@ -199,7 +204,7 @@ for (i, hopf_branch) in enumerate(hopf_branches)
 end
 genh_points = vcat(genh_points...)
 
-DDEBifTool.delete_one_from_approx_equal!(genh_points)
+delete_one_from_approx_equal!(genh_points)
 
 for (i, p) in enumerate(genh_points)
   scatter!(ax1, [p.parameters[2]], [p.parameters[1]], color=:red)
@@ -208,9 +213,9 @@ end
 
 hoho1 = double_hopf_points1[1] # OK
 
-DDEBifTool.determine_unfolding_case(double_hopf_points)
+determine_unfolding_case(double_hopf_points)
 
-hoho1 = double_hopf_points[7]
+hoho1 = double_hopf_points[3]
 
 # plot predicteors in parameter plane
 # fig = Figure()
@@ -225,14 +230,16 @@ hoho1 = double_hopf_points[7]
 # scatter!(ax1, hcat([hoho1.parameters + hoho1.nmfm.K * [-real(hoho1.nmfm.g2100); -real(hoho1.nmfm.g1110)] .* ϵ^2 for ϵ ∈ range(0, 0.1, 100)]...)[end:-1:1, :], color=:orangered, label="Predictor Neimark-Sacker curve II")
 
 # continuation of Neimark-Sacker curves emanating from a double Hopf point
-ϵ₁ = 0.03
-ϵ₂ = 0.02
+ϵ₁ = 0.01
+ϵ₂ = 0.01
 ntst = 20
 ncol = 3
 nsbranch = SetupNSBranch(jet, hoho1, ϵ₁, ϵ₂, ntst, ncol, τs;
   parameterbounds=parameterbounds, δ=0.001, δmin=1e-06, δmax=[0.1; 0.10],
-  MaxNumberofSteps=[100; 100]);
+  MaxNumberofSteps=[200; 200]);
 
+continue!(nsbranch[1])
+reverse_branch!(nsbranch[1])
 continue!(nsbranch[1])
 continue!(nsbranch[2])
 # reverse_branch!(nsbranch[2])

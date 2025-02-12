@@ -85,12 +85,12 @@ end
 mutable struct GenHopf
   coords::Vector{Float64}
   parameters::Vector{Float64}
-  v::Union{Vector{ComplexF64},Vector{Complex{Num}}}
+  v::Union{Vector{ComplexF64},Vector{Complex{Num}},Nothing}
   ω::Float64
   stability::Union{Vector{ComplexF64},Nothing}
   nmfm::Union{GenHopfNormalform,GenHopfNormalformHigherOrder,Nothing}
 end
-GenHopf(coords, parameters, v, ω) = GenHopf(coords, parameters, v, ω, nothing, nothing)
+GenHopf(coords, parameters, v, ω) = GenHopf(coords, parameters, nothing, ω, v, nothing)
 
 # Define custom show function for GenHopfNormalform
 Base.show(io::IO, nf::GenHopfNormalform) = begin
@@ -196,7 +196,7 @@ function point_to_genhopf(jet, p::stst, τs)
     println("Need to calculate stability")
     return nothing
   else
-    freqs = DDEBifTool.closest_eigenvalues_to_imaginary_axis(p.stability)
+    freqs = closest_eigenvalues_to_imaginary_axis(p.stability)
     ω = first(sort(abs.(imag(freqs))))
 
     m = length(τs)
@@ -224,7 +224,7 @@ function normalform(jet, hopf::GenHopf, τs)
   Δ′′(λ) = jet.Δ′′(φ, α, λ)
 
   _, s, V = svd(Δ(λ))
-  indxmin = last(findmin(s))
+  indxmin = last(findmin(s)) # should this be abs(s) instead?
   q = V[:, indxmin]
 
   _, s, V = svd(transpose(Δ(λ)))
@@ -235,7 +235,15 @@ function normalform(jet, hopf::GenHopf, τs)
   p /= transpose(p) * (Δ′(λ) * q)
 
   # define border inverse of characteristic matrix
-  Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [q' 0]]\[y; 0])[1:end-1]
+  # Δᴵᴺⱽ(λ, y) = ([Δ(λ) p; [transpose(q) 0]]\[y; 0])[1:end-1]
+  function Δᴵᴺⱽ(λ, y)
+    sol = [Δ(λ) p; [transpose(q) 0]] \ [y; 0]
+    if abs(sol[end]) > 1e-10
+      error("Border inverse failed")
+    end
+    sol[1:end-1]
+  end
+
   function Aᴵᴺⱽ(λ, η, κ)
     ξ = Δᴵᴺⱽ(λ, η + κ * Δ′(λ) * q)
     γ = first(transpose(p) * (-Δ′(λ) * ξ + 0.5 * κ * Δ′′(λ) * q))
@@ -318,7 +326,6 @@ function normalform(jet, hopf::GenHopf, τs)
   hopf = @set hopf.nmfm = nmfm
 end
 
-# TODO: implement this 
 function normalform_beta(jet, hopf::GenHopf, τs)
   m = length(τs)
   φ = repeat(hopf.coords, 1, m)

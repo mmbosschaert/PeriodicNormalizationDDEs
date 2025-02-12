@@ -70,13 +70,30 @@ function newton(f, df, x₀, V, x_ref; tol=1e-8, maxiterations=20)
   converged = false
   for i = 1:maxiterations
     fx = f(x₀, x_ref)
+    # @show norm(fx)
     if norm(fx) < tol
       iterations = i
       converged = true
       break
     end
+
     jac = df(x₀, x_ref)
+    #jac_df = Main.FiniteDiff.finite_difference_jacobian(x -> f(x, x_ref), x₀)
+
+    # @show findall(abs.(jac - jac_df) .>= 1e-04)
+
     jac[end, :] = V'
+
+    if !all(isfinite, jac) || !all(isfinite, fx) || !all(isfinite, V)
+        println("jac, fx, or V contains NaN/Inf; cannot proceed with solve.")
+        return x₀, iterations, V, converged
+    end
+
+    # check if jac is non-singular
+    if det(jac) ≈ 0.0
+        println("Jacobian is singular; cannot proceed with solve.")
+        return x₀, iterations, V, converged
+    end
 
     D = jac \ [fx [zeros(length(V) - 1); 1.0]]
     dx = D[:, 1]

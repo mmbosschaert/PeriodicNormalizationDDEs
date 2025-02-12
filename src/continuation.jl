@@ -14,7 +14,9 @@ end
 #         parameterbounds = branch.parameterbounds)
 # end
 
-function continue!(branch, f, df, point_to_vec, vec_to_point, V; δ=1, MaxNumberofSteps=250, δmin=0.001, δmax=1.2, parameterbounds=nothing, NumberOfFails=4)
+function continue!(branch, f, df, point_to_vec, vec_to_point, V; 
+                   δ=1, MaxNumberofSteps=250, δmin=0.001, δmax=1.2, parameterbounds=nothing, NumberOfFails=4,
+                   verbose=false)
 
   iterations = 0
   fails = 0
@@ -39,6 +41,12 @@ function continue!(branch, f, df, point_to_vec, vec_to_point, V; δ=1, MaxNumber
     end
     fails = 0
 
+    dims = 2
+    ncol = nsbranch[1].points[1].ncol
+    ntst = nsbranch[1].points[1].ntst
+    new_pars1 = x₀[3dims*(ntst*ncol+1)+1:3dims*(ntst*ncol+1)+2]
+    # Main.scatter!(Main.ax1, [new_pars1[2]], [new_pars1[1]], color=:red)
+
     iterations < 5 ? δ *= 1.2 : δ /= 1.2
     δ = min(δ, δmax)
 
@@ -61,7 +69,7 @@ function continue!(branch, f, df, point_to_vec, vec_to_point, V; δ=1, MaxNumber
     #     branch.meshes[end] = τ
     # end
 
-    println("Step $step: iterations: $iterations stepsize: $δ")
+    verbose && println("Step $step: iterations: $iterations stepsize: $δ")
 
     if δ < δmin
       println("Stepsize to small: δ = $δ")
@@ -79,7 +87,7 @@ function continue!(branch, f, df, point_to_vec, vec_to_point, V; δ=1, MaxNumber
 end
 
 
-function continue!(branch)
+function continue!(branch; tol=1e-08, verbose=false, max_iter=100, callback = x -> false)
 
   f = branch.f
   df = branch.df
@@ -93,9 +101,10 @@ function continue!(branch)
   NumberOfFails = branch.NumberOfFails
 
   fails = 0
-
   iterations = 0
-  for step = 1:MaxNumberofSteps
+
+  step = 1
+  while step ≤ MaxNumberofSteps
 
     # step != 1 || length(branch.points) != 0 ?  x₀ += δ₀*V : x₀
     point_guess = branch.points[end]
@@ -107,23 +116,45 @@ function continue!(branch)
     #     # V = x₀ - x₁
     #     # @show V /= norm(V)
     # end
+    # Main.@infiltrate
+    # Main.@infiltrate
     x₀ += δ * V # new guess
+
+    # maximum(f(vec(point_guess, con_par), point_guess))
+
+    # @show new_pars = x₀[547:548]
+    # point_test = vec_to_point(x₀, point_guess, con_par)
+    # @show point_test.omega
+    # @show point_test.period
+    # Main.scatter!(Main.ax1, new_pars[2], new_pars[1], color=:red, label="Tangent vector")
+    # Main.@infiltrate
+    # Main.lines!(Main.ax2, hcat(point_test.profile...)[1,:], color=:red, label="NS branch")
+    # Main.lines!(Main.ax2, hcat(point_test.profile...)[2,:], color=:red, label="NS branch")
+    # Main.lines!(Main.ax2, hcat(point_test.eigenvector...)[2,:], color=:red, label="NS branch")
+
     # @show display(δ)
     # @show display(V)
-    x₀, iterations, V, converged = newton(f, df, x₀, V, branch.points[end]; tol=1e-8)
+    x₀, iterations, V, converged = newton(f, df, x₀, V, point_guess; tol=tol)
 
     if ~converged
       println("No convergence")
       fails += 1
+      println("Number of fails: $fails")
       if fails < NumberOfFails
         δ /= 2.0
         # branch = @set branch.points = branch.points[1:end-1] # remove last point
         continue
       else
+        println("break")
         break
       end
     end
     fails = 0
+
+    if iterations > max_iter
+      println("To many iterations")
+      break
+    end
 
     iterations < 5 ? δ *= 1.2 : δ /= 1.2
     δ = min(δ, δmax)
@@ -147,7 +178,9 @@ function continue!(branch)
     #     branch.meshes[end] = τ
     # end
 
-    println("Step $step: iterations: $iterations stepsize: $δ")
+    if verbose
+      println("Step $step: iterations: $iterations stepsize: $δ")
+    end
 
     if δ < δmin
       println("Stepsize to small: δ = $δ")
@@ -161,6 +194,10 @@ function continue!(branch)
         break
       end
     end
+
+    callback(point_corrected) && break
+
+    step += 1  # Now we have finished step; go to next
 
   end
 end

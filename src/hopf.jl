@@ -8,13 +8,24 @@ mutable struct Hopf
 end
 Hopf(coords, parameters, v, ω) = Hopf(coords, parameters, v, ω, nothing, nothing)
 
+# Define custom show function for PsolLPC
+function Base.show(io::IO, p::Hopf)
+  println(io, BOLD, "Coordinates:", RESET, " $(p.coords)")
+  println(io, BOLD, "Parameters:", RESET, " $(p.parameters)")
+  println(io, BOLD, "Eigenvector:", RESET, " $(p.v)")
+  println(io, BOLD, "Omega:", RESET, " $(p.ω)")
+  println(io, BOLD, "Stability:", RESET, " $(p.stability)")
+  println(io, BOLD, "Normal Form:", RESET, " $(p.nmfm)")
+end
+
 function vec(hopf::Hopf, _)::Vector{Float64}
   vcat(hopf.coords, hopf.parameters, real(hopf.v), imag(hopf.v), hopf.ω)
 end
 
-function vec_to_point(v::Vector{Float64}, ::Hopf, _)
-  dims = div(length(v) - 1, 4)
-  Hopf(v[1:dims], v[dims+1:2dims], v[2dims+1:3dims] + v[3dims+1:4dims] * im, v[4dims+1])
+function vec_to_point(v::Vector{Float64}, h::Hopf, _)
+  dims = length(h.coords)
+  num_params = length(h.parameters)
+  Hopf(v[1:dims], v[dims+1:dims+num_params], v[dims+1+num_params:dims+num_params+dims] + v[dims+1+num_params+dims:dims+num_params+2dims] * im, v[end])
 end
 
 function point_to_hopf(jet, p::stst, τs)
@@ -22,7 +33,7 @@ function point_to_hopf(jet, p::stst, τs)
     println("Need to calculate stability")
     return nothing
   else
-    freqs = DDEBifTool.closest_eigenvalues_to_imaginary_axis(p.stability)
+    freqs = closest_eigenvalues_to_imaginary_axis(p.stability)
     ω = first(sort(abs.(imag(freqs))))
 
     m = length(τs)
@@ -108,8 +119,8 @@ function normalform(jet, hopf::Hopf, τs)
   C(v₁, v₂, v₃) = jet.D3(φ, α, Ξ(v₁), Ξ(v₂), Ξ(v₃))
 
   ϕ(θ) = exp(λ * θ) * q
-  h2000(θ) = exp(2 * λ * θ) * (Δ(2 * λ) \ B(ϕ, ϕ))
-  h1100(_) = Δ(0) \ B(ϕ, conj ∘ ϕ)
+  h2000(θ) = exp(2.0 * λ * θ) * (Δ(2.0 * λ) \ B(ϕ, ϕ))
+  h1100(_) = Δ(0.0) \ B(ϕ, conj ∘ ϕ)
 
   c₁ = first((1 / 2) * transpose(p) * (B(conj ∘ ϕ, h2000) + 2 * B(ϕ, h1100) + C(ϕ, ϕ, conj ∘ ϕ)))
 
@@ -139,14 +150,26 @@ function locate_genh(jet, hopf_br, indx, par_dir, τs; MaxIter=100, tol=1e-10)
   hopf1 = hopf_br.points[indx]
   hopf2 = hopf_br.points[indx+1]
 
+  # check if there is a sign change in the first Lyapunov coefficient
+  if real(sign(hopf1.nmfm)) * real(sign(hopf2.nmfm)) > 0.0
+    println("No sign change in first Lyapunov coefficient")
+    return
+  end
+
   parameter_index = length(hopf1.coords) + par_dir
 
   # create function and Jacobian for correction in one parameter
   fpar(p, hopf_ref) = hopf_br.f(vcat(p[1:parameter_index-1], hopf_ref.parameters[par_dir], p[parameter_index:end]), hopf_ref)[1:end-1]
   dfpar(p, hopf_ref) = hopf_br.df(vcat(p[1:parameter_index-1], hopf_ref.parameters[par_dir], p[parameter_index:end]), hopf1)[1:end-1, 1:end.!=parameter_index]
 
-  for i = 1:MaxIter
-    hopf_new = middle_point(fpar, dfpar, hopf1, hopf2, parameter_index, par_dir, jet, τs)
+  convergence = false
+  for _ = 1:MaxIter
+    hopf_new = try
+      middle_point(fpar, dfpar, hopf1, hopf2, parameter_index, par_dir, jet, τs)
+    catch
+      println("Could not create middle point")
+      return
+    end
     if real(sign(hopf1.nmfm * hopf_new.nmfm)) < 0.0
       hopf2 = hopf_new
     else
@@ -154,8 +177,14 @@ function locate_genh(jet, hopf_br, indx, par_dir, τs; MaxIter=100, tol=1e-10)
     end
 
     if abs(real(hopf_new.nmfm)) < tol
+      convergence = true
       break
     end
+  end
+
+  if ~convergence
+    println("Newton did not converge")
+    return
   end
 
   hopf_new = stability(jet, hopf_new, τs)
@@ -181,7 +210,7 @@ function middle_point(fpar, dfpar, hopf1::Hopf, hopf2::Hopf, parameter_index, pa
   insert!(x_new, parameter_index, hopfmiddle.parameters[par_dir])
 
   # convert to Hopf point
-  hopf_new = DDEBifTool.vec_to_point(x_new, hopfmiddle, nothing)
+  hopf_new = vec_to_point(x_new, hopfmiddle, nothing)
 
   # calculate l1 norm of normal form coefficients
   hopf_new.nmfm = normalform(jet, hopf_new, τs)
@@ -196,14 +225,14 @@ function LocateDoubleHopf(jet, hoho_guess, τs; MaxIter=100, tol=1e-10)
     @show hoho_guess = point_to_hoho(jet, hoho_guess, τs)
   end
 
-  f, df = DDEBifTool.defining_system_DoubleHopf(jet, τs, dims)
+  f, df = defining_system_DoubleHopf(jet, τs, dims)
   x₀, _, converged = newton(f, df, vec(hoho_guess, nothing), hoho_guess; tol=1e-10, maxIter=100)
   if !converged
     println("Newton did not converge")
   end
 
   # convert corrected double Hopf point
-  hoho = DDEBifTool.vec_to_point(x₀, hoho_guess, nothing)
+  hoho = vec_to_point(x₀, hoho_guess, nothing)
 
   # add stability information
   hoho = stability(jet, hoho, τs)
@@ -244,7 +273,7 @@ function SetupHopfBranch(jet, hopf_point, τs; parameterbounds=nothing, δ=0.001
   # tangent vector
   v₀ = qr(jac').Q[:, end]
 
-  hopf_branch = (points=Hopf[], tangents=[], stepsizes=[],
+  hopf_branch = Branch(points=Hopf[], tangents=[], stepsizes=[],
     f=(x, hopf) -> Hopf_res(jet.system, τs, Δre, Δim, x, hopf, dims),
     df=(x, hopf) -> df(x, [real(hopf.v); imag(hopf.v)]),
     parameterbounds=parameterbounds,
@@ -253,7 +282,8 @@ function SetupHopfBranch(jet, hopf_point, τs; parameterbounds=nothing, δ=0.001
     δmax=δmax,
     MaxNumberofSteps=MaxNumberofSteps,
     con_par=nothing,
-    NumberOfFails=NumberOfFails
+    NumberOfFails=NumberOfFails,
+    specialpoints = nothing
   )
 
   push!(hopf_branch.points, hopf_point)

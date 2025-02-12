@@ -366,7 +366,7 @@ function vec_to_point(v,p_prev::psol_pd,_)
 end
 
 function SetupPDBranch(jet,pd_guess,τs; parameterbounds=nothing, δ=.001, δmin=1e-06, δmax=0.01, MaxNumberofSteps = 250, 
-            NumberOfFails = 4) 
+            NumberOfFails = 4, con_par = nothing) 
 
     pd_guess = psol_to_pd(pd_guess)
     pd_guess = ns_w_approx(jet,pd_guess,τs);
@@ -417,15 +417,19 @@ function SetupPDBranch(jet,pd_guess,τs; parameterbounds=nothing, δ=.001, δmin
     pd_corrected = vec_to_point(x₀new, pd_guess, nothing)
 
     # continuation with own newton
-    pd_branch = (points = psol_pd[], tangents = [], stepsizes = [], 
+    pd_branch = Branch(
+        points = psol_pd[],
+        tangents = [],
+        stepsizes = [], 
         f = f, df = df,
         parameterbounds=parameterbounds,
         δ=δ,
         δmin=δmin,
         δmax=δmax,
         MaxNumberofSteps = MaxNumberofSteps,
-        con_par = nothing,
-        NumberOfFails = NumberOfFails
+        con_par = con_par,
+        NumberOfFails = NumberOfFails,
+        specialpoints = nothing
     )
 
     push!(pd_branch.points, pd_corrected)
@@ -439,5 +443,5 @@ function LocateGPDPoints(branch)
     pd_sign_change = findall(c -> c != 0.0,(pd_coeffs .> 0.0)[2:end] - (pd_coeffs .> 0.0)[1:end-1])
     gpd_indx = pd_sign_change
     specialpoints = (gpd_indx = gpd_indx,)
-    merge(branch, (specialpoints = specialpoints,))
+    @set branch.specialpoints = specialpoints
 end

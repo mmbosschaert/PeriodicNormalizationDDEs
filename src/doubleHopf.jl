@@ -101,7 +101,6 @@ end
 function locate_double_hopf(branch)
   num_unstable = zeros(Int, length(branch))
   for (i, p) in enumerate(branch)
-    p.stability
     # remove ω from stability field
     ind1 = findfirst(λ -> imag(λ) ≈ p.ω, p.stability)
     ind2 = findfirst(λ -> imag(λ) ≈ -p.ω, p.stability)
