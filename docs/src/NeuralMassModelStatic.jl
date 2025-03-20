@@ -1091,7 +1091,7 @@ end
 # Next we continue the period doubling branch emanating from the period doubling point on the periodic orbit branch. We will continue the branch in the parameters \( a \) and \( c \).
 
 ##!CODEBOUNDARY @example NeuralMassModel
-pd_guess = psol_branch.points[psol_branch.specialpoints.indx_pd][1]
+pd_guess = psol_branch.points[psol_branch.specialpoints.indx_pd][2]
 pd_branchI = SetupPDBranch(
   jet,
   pd_guess, 
@@ -1102,6 +1102,7 @@ pd_branchI = SetupPDBranch(
   con_par = [par_indx.a; par_indx.c])
 continue!(pd_branchI)
 reverse_branch!(pd_branchI)
+pd_branchI = @set pd_branchI.MaxNumberofSteps = 550
 continue!(pd_branchI)
 ##!CODEBOUNDARY
 
@@ -1206,7 +1207,7 @@ psol_indx = if gpd_indx[2] > gpd_indx[1]
 else
     (gpd_indx[1] + gpd_indx[2]) ÷ 2
 end
-psol1 = [pd_branchI.points[psol_indx]]
+psol1 = [pd_branchI.points[psol_indx-2]]
 
 # # psol with double period and
 psol1_double_period = psol1[1]
@@ -1324,7 +1325,7 @@ lpc_branchII = SetupLPCBranch(jet, lpc_guess, τs;
 function callback_lpc_branchII(x, gpd_points)
     distance1 = norm(gpd_points[1].parameters - x.parameters)
     distance2 = norm(gpd_points[2].parameters - x.parameters)
-    if distance1 < 10^-4 || distance2 < 10^-4
+    if distance1 < 10^-3 || distance2 < 10^-3
         println("Callback: distance between GPD and solution is less than 1e-4")
         return true
     end
@@ -1341,6 +1342,13 @@ lines!(ax1, extract_pars(pd_branchI.points), linewidth=2)
 lines!(ax1, extract_pars(lpc_branchII.points), linewidth=2)
 scatter!(extract_pars(gpd_points), color=:red)
 fig
+
+# export pd_branchI, lpc_branchII, gpd_points to CSV
+using CSV, DataFrames
+export_file = "/home/maikel/Documents/MyPapers/PeriodicNormalization/634fa3e6c38b181e21409ec0/arXiv version/data/pdbranchI.csv"
+CSV.write(export_file, DataFrame(extract_pars(pd_branchI.points)', :auto))
+export_file = "/home/maikel/Documents/MyPapers/PeriodicNormalization/634fa3e6c38b181e21409ec0/arXiv version/data/lpcbranchII.csv"
+CSV.write(export_file, DataFrame(extract_pars(lpc_branchII.points)', :auto))
 
 ##!CODEBOUNDARY
 
@@ -1383,6 +1391,16 @@ ax1.ylabel = "a"
 # save("second_lpc_branch.png", fig) # hide
 fig
 ##!CODEBOUNDARY
+
+# Export curse to CSV
+#
+##!CODEBOUNDARY @example NeuralMassModel
+export_file = "/home/maikel/Documents/MyPapers/PeriodicNormalization/634fa3e6c38b181e21409ec0/arXiv version/data/lpcbranchIINegativeSign.csv"
+CSV.write(export_file, DataFrame(extract_pars(lpc_branchII.points[get_nmfm_coefficients(lpc_branchII).<0.0])', :auto))
+export_file = "/home/maikel/Documents/MyPapers/PeriodicNormalization/634fa3e6c38b181e21409ec0/arXiv version/data/lpcbranchIIPositiveSign.csv"
+CSV.write(export_file, DataFrame(extract_pars(lpc_branchII.points[get_nmfm_coefficients(lpc_branchII).>0.0])', :auto))
+##!CODEBOUNDARY
+
 
 #
 # **Conclusion:**

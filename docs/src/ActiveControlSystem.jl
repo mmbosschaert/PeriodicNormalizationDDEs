@@ -30,6 +30,7 @@ using Infiltrator
 using DifferentialEquations
 using JLD
 using CairoMakie
+using CSV, DataFrames
 ##!CODEBOUNDARY
 
 #
@@ -475,5 +476,170 @@ for (i,p) in enumerate(genh_points)
            label="Generalized Hopf point",)
 end
 axislegend(ax1, merge=:true, position=:rb)
+fig
+##!CODEBOUNDARY
+
+
+#
+# ## Plot sign of normal form coefficients along the branches
+#
+# In this visualization, we compare the signs of the normal form coefficients along each limit-point cycle (LPC) branch, coloring positive coefficients in blue and negative coefficients in orange-red to draw attention to sign changes. We see that the there is a indeed a cusp point on the first LPC branch where the normal form coefficients change sign.
+
+###!CODEBOUNDARY @example NeuralMassModel
+fig = Figure();
+ax1 = Axis(fig[1, 1], title="Neimark-Sacker curves")
+lines!(ax1, extract_pars(hopf_brI.points), label="Hopf branch", color=:lightgray)
+for branch in lpc_branches
+  if ~isempty(branch.points[get_nmfm_coefficients(branch).<0.0])
+    scatter!(
+      ax1,
+      extract_pars(branch.points[get_nmfm_coefficients(branch).<0.0]),
+      markersize=5,
+      color=:orangered,
+      label="LPC branch negative sign"
+    )
+  end
+  if ~isempty(branch.points[get_nmfm_coefficients(branch).>0.0])
+    scatter!(
+      ax1,
+      extract_pars(branch.points[get_nmfm_coefficients(branch).>0.0]),
+      markersize=5,
+      color=:royalblue,
+      label="LPC branch positive sign"
+    )
+  end
+end
+for (i,p) in enumerate(genh_points)
+  scatter!(ax1, [p.parameters[1]], [p.parameters[2]], 
+           color=:purple,
+           markersize=5,
+           label="Generalized Hopf point",)
+end
+for branch in [nsbranchI; nsbranchII]
+  if ~isempty(branch.points[real.(get_nmfm_coefficients(branch)).<0.0])
+    scatter!(
+      ax1,
+      extract_pars(branch.points[real.(get_nmfm_coefficients(branch)).<0.0]),
+      markersize=4,
+      color=:orangered,
+      label="NS branch negative sign"
+    )
+  end
+  if ~isempty(branch.points[real.(get_nmfm_coefficients(branch)).>0.0])
+    scatter!(
+      ax1,
+      extract_pars(branch.points[real.(get_nmfm_coefficients(branch)).>0.0]),
+      markersize=4,
+      color=:royalblue,
+      label="NS branch positive sign"
+    )
+  end
+end
+for (i,p) in enumerate(double_hopf_points)
+  scatter!(ax1, [p.parameters[1]], [p.parameters[2]], 
+           color=:purple,
+           markersize=5,
+           label="double Hopf point",)
+end
+ax1.xlabel = "ζ"
+ax1.ylabel = "τ"
+axislegend(ax1, merge=:true, position=:lt)
+fig
+##!CODEBOUNDARY
+
+#
+# ## Export data
+#
+
+##!CODEBOUNDARY @example NeuralMassModel
+# Set export flag
+exportdata = true
+
+if exportdata == true
+    # Define export directory (Modify the path accordingly)
+    export_dir = "/home/maikel/Documents/MyPapers/PeriodicNormalization/634fa3e6c38b181e21409ec0/arXiv version/data/"
+
+    # Function to export data
+    function export_curve(data, filename)
+        export_file = joinpath(export_dir, filename)
+        CSV.write(export_file, DataFrame(data', :auto))  # Transpose to match expected format
+    end
+
+    # Export Hopf branch points
+    export_curve(extract_pars(hopf_brI.points), "hopf_branch.csv")
+
+    # Export LPC branches
+    for (i, branch) in enumerate(lpc_branches)
+        if ~isempty(branch.points[get_nmfm_coefficients(branch) .< 0.0])
+            export_curve(extract_pars(branch.points[get_nmfm_coefficients(branch) .< 0.0]), "lpcbranch_neg_$i.csv")
+        end
+        if ~isempty(branch.points[get_nmfm_coefficients(branch) .> 0.0])
+            export_curve(extract_pars(branch.points[get_nmfm_coefficients(branch) .> 0.0]), "lpcbranch_pos_$i.csv")
+        end
+    end
+
+    # Export Generalized Hopf points
+    genh_data = [[p.parameters[1], p.parameters[2]] for p in genh_points]
+    if ~isempty(genh_data)
+        export_curve(hcat(genh_data...), "generalized_hopf_points.csv")
+    end
+
+    # Export NS branches
+    for (i, branch) in enumerate([nsbranchI; nsbranchII])
+        if ~isempty(branch.points[real.(get_nmfm_coefficients(branch)) .< 0.0])
+            export_curve(extract_pars(branch.points[real.(get_nmfm_coefficients(branch)) .< 0.0]), "nsbranch_neg_$i.csv")
+        end
+        if ~isempty(branch.points[real.(get_nmfm_coefficients(branch)) .> 0.0])
+            export_curve(extract_pars(branch.points[real.(get_nmfm_coefficients(branch)) .> 0.0]), "nsbranch_pos_$i.csv")
+        end
+    end
+
+    # Export Double Hopf points
+    double_hopf_data = [[p.parameters[1], p.parameters[2]] for p in double_hopf_points]
+    if ~isempty(double_hopf_data)
+        export_curve(hcat(double_hopf_data...), "double_hopf_points.csv")
+    end
+end
+##!CODEBOUNDARY
+
+#
+# ## Load JLD2 files generated with BifurcationKit
+#
+ 
+##!CODEBOUNDARY @example NeuralMassModel
+using JLD2
+using BifurcationKit
+ns_po_sh = load("/home/maikel/Documents/MyPapers/PeriodicNormalization/Demos/ns_po_sh.jld2", "ns_po_sh")
+ns_po_sh_reverse = load("/home/maikel/Documents/MyPapers/PeriodicNormalization/Demos/ns_po_sh_reverse.jld2", "ns_po_sh_reverse")
+ns_po_sh_2 = load("/home/maikel/Documents/MyPapers/PeriodicNormalization/Demos/ns_po_sh_2.jld2", "ns_po_sh_2")
+ns_po_sh_2_reverse = load("/home/maikel/Documents/MyPapers/PeriodicNormalization/Demos/ns_po_sh_2_reverse.jld2", "ns_po_sh_2_reverse")
+hp_codim2_1 = load("/home/maikel/Documents/MyPapers/PeriodicNormalization/Demos/hp_codim2_1.jld2", "hp_codim2_1")
+lpc_po = load("/home/maikel/Documents/MyPapers/PeriodicNormalization/Demos/lpc_po.jld2", "lpc_po")
+##!CODEBOUNDARY
+
+#
+# ## Plot
+#
+ 
+##!CODEBOUNDARY @example NeuralMassModel
+fig = Figure(fontsize=25)
+ax1 = Axis(fig[1, 1], xlabel="ζ", ylabel="τ", title="Pseudo-spectral method approximation with N=12")
+lines!(hp_codim2_1.branch.ζ, hp_codim2_1.branch.τ, label="Hopf curve")
+lines!(lpc_po.ζ, lpc_po.τ, color=:lightblue, label="Limit point of cycles curve", linewidth=3)
+scatter!(ax2, [hp_codim2_1.specialpoint[3].printsol.ζ], [hp_codim2_1.specialpoint[3].printsol.τ], color=Cycled(2), label="Generalized Hopf", markersize=10, marker=:diamond)
+scatter!(ax2, [hp_codim2_1.specialpoint[4].printsol.ζ], [hp_codim2_1.specialpoint[4].printsol.τ], color=Cycled(2), markersize=10, marker=:diamond)
+scatter!(ax2, [hp_codim2_1.specialpoint[7].printsol.ζ], [hp_codim2_1.specialpoint[7].printsol.τ], color=Cycled(2), markersize=10, marker=:diamond)
+scatter!(ax2, ns_po_sh.ζ[ns_po_sh.CH.<0.0], ns_po_sh.τ[ns_po_sh.CH.<0.0], color=:orangered, label="Neimark-Sacker curve: real(d) < 0")
+scatter!(ax2, ns_po_sh.ζ[ns_po_sh.CH.>0.0], ns_po_sh.τ[ns_po_sh.CH.>0.0], color=:royalblue, label="Neimark-Sacker curve: real(d) > 0")
+scatter!(ax2, ns_po_sh_reverse.ζ[ns_po_sh_reverse.CH.<0.0], ns_po_sh_reverse.τ[ns_po_sh_reverse.CH.<0.0], color=:orangered)
+scatter!(ax2, ns_po_sh_reverse.ζ[ns_po_sh_reverse.CH.>0.0], ns_po_sh_reverse.τ[ns_po_sh_reverse.CH.>0.0], color=:royalblue)
+scatter!(ax2, ns_po_sh_2.ζ[ns_po_sh_2.CH.<0.0], ns_po_sh_2.τ[ns_po_sh_2.CH.<0.0], color=:orangered)
+scatter!(ax2, ns_po_sh_2.ζ[ns_po_sh_2.CH.>0.0], ns_po_sh_2.τ[ns_po_sh_2.CH.>0.0], color=:royalblue)
+scatter!(ax2, ns_po_sh_2_reverse.ζ[ns_po_sh_2_reverse.CH.<0.0], ns_po_sh_2_reverse.τ[ns_po_sh_2_reverse.CH.<0.0], color=:orangered)
+scatter!(ax2, ns_po_sh_2_reverse.ζ[ns_po_sh_2_reverse.CH.>0.0], ns_po_sh_2_reverse.τ[ns_po_sh_2_reverse.CH.>0.0], color=:royalblue)
+scatter!(ax2, [hp_codim2_1.specialpoint[2].printsol.ζ], [hp_codim2_1.specialpoint[2].printsol.τ], color=:black, label="Double Hopf point", markersize=10)
+scatter!(ax2, [hp_codim2_1.specialpoint[6].printsol.ζ], [hp_codim2_1.specialpoint[6].printsol.τ], color=:black, markersize=10)
+fig[2, :] = Legend(fig, ax2, "", orientation=:horizontal, framevisible=false)
+ylims!(ax2, 5.0, 15.0)
 fig
 ##!CODEBOUNDARY
