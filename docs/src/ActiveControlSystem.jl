@@ -33,6 +33,10 @@ using CairoMakie
 using CSV, DataFrames
 ##!CODEBOUNDARY
 
+
+add Symbolics, Setfield, Infiltrator, DifferentialEquations, JLD, CairoMakie, CSV, DataFrames
+
+
 #
 # ## Define constants
 #
@@ -309,6 +313,32 @@ for nsbranch in [nsbranchI; nsbranchII]
 end
 ##!CODEBOUNDARY
 
+#
+# Helper function to extract Chenciner points on Neimark-Sacker branch
+#
+
+##!CODEBOUNDARY @example NeuralMassModel
+function get_pars_chc(branch; max_val = 0.01)
+  coeffs = real.(get_nmfm_coefficients(branch))
+  # Loop over consecutive coefficients to check for a sign change,
+  # but only if both values are not too large:
+  mid_pars = []
+  for i in 1:(length(coeffs)-1)
+    # Check if the signs are different (exclude a potential 0 case if desired)
+    if (coeffs[i] < 0 && coeffs[i+1] > 0) || (coeffs[i] > 0 && coeffs[i+1] < 0)
+      # Only mark if both coefficients are below the max threshold:
+      if abs(coeffs[i]) < max_val && abs(coeffs[i+1]) < max_val
+        # Mark at the midpoint between the two parameter points.
+        # (Assumes each element of pars is an array or tuple of parameters.)
+        mid_par = (branch.points[i].parameters +  branch.points[i + 1].parameters)/2.0
+        push!(mid_pars, mid_par) 
+      end
+    end
+  end
+  mid_pars
+end
+##!CODEBOUNDARY
+
 
 #
 # Plot Neimark-Sacker curvers along with normal form coefficients
@@ -346,9 +376,13 @@ for (i,p) in enumerate(double_hopf_points)
 end
 ax1.xlabel = "ζ"
 ax1.ylabel = "τ"
+scatter!(hcat(get_pars_chc(nsbranchI[2], max_val = 0.1)...), color = :black, label = "CHC")
+scatter!(hcat(get_pars_chc(nsbranchII, max_val = 0.01)...), color = :black)
 axislegend(ax1, merge=:true, position=:lt)
 fig
-##!CODEBOUNDARY
+##!CODEBOUNDARY @example NeuralMassModel
+
+
 
 #
 # ## Continue limit point of cycles emanating from the generalized Hopf points
@@ -553,7 +587,7 @@ fig
 
 ##!CODEBOUNDARY @example NeuralMassModel
 # Set export flag
-exportdata = true
+exportdata = false
 
 if exportdata == true
     # Define export directory (Modify the path accordingly)
