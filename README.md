@@ -25,13 +25,13 @@ Designed to work seamlessly as a plugin for the powerful [BifurcationKit.jl](htt
 
 This software is the numerical realization of a trilogy of theoretical advancements in the bifurcation theory of DDEs by **Bram Lentjes, Maikel M. Bosschaert, Len Spek, and Yuri A. Kuznetsov**.
 
-### 1. The Numerical Breakthrough (The Core)
+### 1. The Numerical Breakthrough: Periodic Normalization
 **[Numerical Periodic Normalization at Codim 1 Bifurcations of Limit Cycles in DDEs](https://arxiv.org/abs/2505.19786)** This preprint provides the explicit computational formulas implemented here. It introduces the **Characteristic Operator**, a crucial innovation that allows the abstract homological equations of the normal form theory to be solved using robust, standard BVP solvers rather than unstable shooting methods.
 
-### 2. The Foundation: Center Manifolds
+### 2. The Foundation: Periodic Center Manifolds
 **[Periodic Center Manifolds for DDEs in the Light of Suns and Stars](https://link.springer.com/article/10.1007/s10884-023-10289-9)** *Journal of Dynamics and Differential Equations (2023)* Establishes the existence of smooth periodic center manifolds for non-hyperbolic cycles in DDEs using the sun-star calculus, providing the rigorous domain where our computations take place.
 
-### 3. The Framework: Normal Forms
+### 3. The Framework: Periodic Normal Forms
 **[Periodic Normal Forms for Bifurcations of Limit Cycles in DDEs](https://www.sciencedirect.com/science/article/abs/pii/S0022039625000725)** *Journal of Differential Equations (2025)* Provides the rigorous theoretical construction of the periodic normalization framework. It proves the existence of a special coordinate system on the center manifold, constructed via **time-periodic smooth Jordan chains** for the original and adjoint operators, which allows the local dynamics to be described by canonical periodic normal forms.
 
 ---
