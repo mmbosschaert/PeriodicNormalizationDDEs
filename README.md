@@ -29,10 +29,10 @@ This software is the numerical realization of a trilogy of theoretical advanceme
 **[Numerical Periodic Normalization at Codim 1 Bifurcations of Limit Cycles in DDEs](https://arxiv.org/abs/2505.19786)** This preprint bridges the gap between theory and code, providing the explicit formulas we implement. A major challenge in DDEs is solving the "homological equations" for normal form coefficients. This work introduces the **Characteristic Operator**, a crucial innovation that bypasses shooting methods entirely. It reformulates the abstract operator equations into Periodic Linear Boundary Value Problems. This allows us to use Orthogonal Collocation, solving for the solution over the entire period simultaneously, to compute the coefficients with high precision and stability.
 
 ### 2. The Framework: Periodic Normal Forms
-**[Periodic Normal Forms for Bifurcations of Limit Cycles in DDEs](https://www.sciencedirect.com/science/article/abs/pii/S0022039625000725)** *Journal of Differential Equations (2025)* Provides the rigorous theoretical construction of the periodic normalization framework. It proves the existence of a special coordinate system on the center manifold, constructed via **time-periodic smooth Jordan chains** for the original and adjoint operators, which allows the local dynamics to be described by canonical periodic normal forms.
+**[Periodic Normal Forms for Bifurcations of Limit Cycles in DDEs](https://www.sciencedirect.com/science/article/abs/pii/S0022039625000725)** *Journal of Differential Equations (2025)* This paper provides the rigorous theoretical construction of the periodic normalization framework. It establishes a coordinate system on the periodic center manifold using periodic smooth Jordan chains for the original and adjoint operators. This framework allows us to study the local dynamics on the periodic center mnaifold in terms of periodic normal forms.
 
 ### 3. The Foundation: Periodic Center Manifolds
-**[Periodic Center Manifolds for DDEs in the Light of Suns and Stars](https://link.springer.com/article/10.1007/s10884-023-10289-9)** *Journal of Dynamics and Differential Equations (2023)* This paper lays the necessary mathematical groundwork for the entire project. In Delay Differential Equations, the state space is infinite-dimensional because the system's future depends on its history, not just its current state. This "memory" makes standard geometric tools difficult to apply. This work overcomes those hurdles using the Sun-Star Calculus framework. It proves that despite the infinite-dimensional nature of the delays, there exists a smooth, finite-dimensional "center manifold" effectively capturing the critical dynamics. This rigorous guarantee allows us to reduce the complex, infinite-dimensional DDE pr
+**[Periodic Center Manifolds for DDEs in the Light of Suns and Stars](https://link.springer.com/article/10.1007/s10884-023-10289-9)** *Journal of Dynamics and Differential Equations (2023)* This paper lays the necessary mathematical groundwork for the entire project. In Delay Differential Equations, the state space is infinite-dimensional because the system's future depends on its history, not just its current state. This "memory" makes standard geometric tools difficult to apply. This work overcomes those hurdles using the **Sun-Star Calculus** framework. It proves that despite the infinite-dimensional nature of the delays, there exists a smooth, finite-dimensional "center manifold" effectively capturing the critical dynamics. This method allows us to reduce the complex, infinite-dimensional DDE problem into a manageable, finite-dimensional form that our software can solve numerically.
 
 ---
 
@@ -40,10 +40,10 @@ This software is the numerical realization of a trilogy of theoretical advanceme
 
 The package automates the complex "Periodic Normalization" pipeline:
 
-1.  **Input:** Takes a periodic orbit bifurcation point detected by `BifurcationKit.jl`.
+1.  **Input:** Takes a periodic orbit bifurcation point detected by `BifurcationKit.jl` or `DDE-BifTool.m`.
 2.  **Operator Construction:** Constructs the *Characteristic Operator* associated with the linearization around the cycle.
-3.  **BVP Solving:** Instead of tackling the infinite-dimensional DDE operator directly, we solve a sequence of Linear Boundary Value Problems (LBVPs) on the interval $[0, T]$ using **Orthogonal Collocation**.
-4.  **Coefficient Extraction:** Integral formulas involving the solutions of these LBVPs (and the adjoint eigenfunctions) are evaluated to yield the critical normal form coefficient (e.g., the first Lyapunov coefficient).
+3.  **BVP Solving:** Instead of tackling the infinite-dimensional DDE operator directly, we solve a sequence of Periodic Linear Boundary Value Problems on the interval $[0, T]$ using **Orthogonal Collocation**.
+4.  **Coefficient Extraction:** Integral formulas involving the solutions of these periodic BVPs (and the adjoint eigenfunctions) are evaluated to yield the critical normal form coefficient.
 5.  **Output:** A numerical value determining the bifurcation's criticality (e.g., `c < 0` $\to$ Supercritical/Stable, `c > 0` $\to$ Subcritical/Unstable).
 
 ---
