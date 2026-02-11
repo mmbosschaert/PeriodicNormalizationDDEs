@@ -26,13 +26,13 @@ Designed to work seamlessly as a plugin for the powerful [BifurcationKit.jl](htt
 This software is the numerical realization of a trilogy of theoretical advancements in the bifurcation theory of DDEs by **Bram Lentjes, Maikel M. Bosschaert, Len Spek, and Yuri A. Kuznetsov**.
 
 ### 1. The Numerical Breakthrough: Periodic Normalization
-**[Numerical Periodic Normalization at Codim 1 Bifurcations of Limit Cycles in DDEs](https://arxiv.org/abs/2505.19786)** This preprint provides the explicit computational formulas implemented here. It introduces the **Characteristic Operator**, a crucial innovation that allows the abstract homological equations of the normal form theory to be solved using robust, standard BVP solvers rather than unstable shooting methods.
+**[Numerical Periodic Normalization at Codim 1 Bifurcations of Limit Cycles in DDEs](https://arxiv.org/abs/2505.19786)** This preprint bridges the gap between theory and code, providing the explicit formulas we implement. A major challenge in DDEs is solving the "homological equations" for normal form coefficients. This work introduces the **Characteristic Operator**, a crucial innovation that bypasses shooting methods entirely. It reformulates the abstract operator equations into Periodic Linear Boundary Value Problems. This allows us to use Orthogonal Collocation, solving for the solution over the entire period simultaneously, to compute the coefficients with high precision and stability.
 
-### 2. The Foundation: Periodic Center Manifolds
-**[Periodic Center Manifolds for DDEs in the Light of Suns and Stars](https://link.springer.com/article/10.1007/s10884-023-10289-9)** *Journal of Dynamics and Differential Equations (2023)* Establishes the existence of smooth periodic center manifolds for non-hyperbolic cycles in DDEs using the sun-star calculus, providing the rigorous domain where our computations take place.
-
-### 3. The Framework: Periodic Normal Forms
+### 2. The Framework: Periodic Normal Forms
 **[Periodic Normal Forms for Bifurcations of Limit Cycles in DDEs](https://www.sciencedirect.com/science/article/abs/pii/S0022039625000725)** *Journal of Differential Equations (2025)* Provides the rigorous theoretical construction of the periodic normalization framework. It proves the existence of a special coordinate system on the center manifold, constructed via **time-periodic smooth Jordan chains** for the original and adjoint operators, which allows the local dynamics to be described by canonical periodic normal forms.
+
+### 3. The Foundation: Periodic Center Manifolds
+**[Periodic Center Manifolds for DDEs in the Light of Suns and Stars](https://link.springer.com/article/10.1007/s10884-023-10289-9)** *Journal of Dynamics and Differential Equations (2023)* This paper lays the necessary mathematical groundwork for the entire project. In Delay Differential Equations, the state space is infinite-dimensional because the system's future depends on its history, not just its current state. This "memory" makes standard geometric tools difficult to apply. This work overcomes those hurdles using the Sun-Star Calculus framework. It proves that despite the infinite-dimensional nature of the delays, there exists a smooth, finite-dimensional "center manifold" effectively capturing the critical dynamics. This rigorous guarantee allows us to reduce the complex, infinite-dimensional DDE pr
 
 ---
 
