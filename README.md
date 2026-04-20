@@ -13,7 +13,7 @@ Designed to work seamlessly as a plugin for the powerful [BifurcationKit.jl](htt
 ## 🚀 Key Features
 
 * **BifurcationKit Integration:** Directly consumes bifurcation points detected by `BifurcationKit.jl`, streamlining your workflow from continuation to criticality analysis.
-* **Codimension-1 Support:** Handles **Fold** (Limit Point), **Flip** (Period-Doubling), and **Neimark-Sacker** (Torus) bifurcations of limit cycles.
+* **Codim 1 Support:** Handles **Fold** (Limit Point), **Flip** (Period-Doubling), and **Neimark-Sacker** (Torus) bifurcations of limit cycles.
 * **Criticality Detection:** Explicitly computes the coefficients needed to distinguish between **nondegenerate, subcritical, and supercritical** bifurcations.
 * **Numerical Robustness:** Introduces the **Characteristic Operator** to transform abstract operator equations into boundary-value problems (BVPs) solvable via **Orthogonal Collocation**.
 * **Sun-Star Powered:** Built on the rigorous "Sun-Star" dual semigroup perturbation framework, ensuring theoretical soundness for delay equations.
