@@ -1,15 +1,14 @@
 # 🌀 PeriodicNormalizationDDEs.jl
 
-> **Unveiling the Critical Dynamics of Limit Cycles in Delay Differential Equations.**
+> **Bifurcations of Limit Cycles in Delay Differential Equations: Theory & Software.**
 
-[![arXiv](https://img.shields.io/badge/arXiv-2505.19786-b31b1b.svg)](https://arxiv.org/abs/2505.19786)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Publication](https://img.shields.io/badge/epubs.siam.org/doi/10.1137/25M1763573)](https://epubs.siam.org/doi/10.1137/25M1763573)
 [![Julia](https://img.shields.io/badge/Julia-1.9+-9558B2.svg?logo=julia)](https://julialang.org)
-[![BifurcationKit](https://img.shields.io/badge/Plugin-BifurcationKit.jl-blue.svg)](https://github.com/bifurcationkit/BifurcationKit.jl)
+[![BifurcationKit](https://img.shields.io/badge/Plugin-BifurcationKit.jl-blue.svg)](https://bifurcationkit.github.io/BifurcationKitDocs.jl/stable/)
 
-**PeriodicNormalizationDDEs.jl** is a specialized Julia package for computing the **critical normal form coefficients** of codimension-1 bifurcations of limit cycles in Delay Differential Equations (DDEs). 
+**PeriodicNormalizationDDEs.jl** is a specialized Julia package for computing the **critical normal form coefficients** of codimension one bifurcations of limit cycles in Delay Differential Equations (DDEs). 
 
-Designed to work seamlessly as a plugin for the powerful [BifurcationKit.jl](https://github.com/bifurcationkit/BifurcationKit.jl) ecosystem, this tool bridges the gap between abstract functional analysis and high-performance numerics. It implements the explicit computational formulas derived in the 2025 breakthrough work using the **Sun-Star Calculus** framework.
+Designed to work seamlessly as a plugin for the powerful [BifurcationKit.jl](https://github.com/bifurcationkit/BifurcationKit.jl) ecosystem, this tool bridges the gap between abstract functional analysis and high-performance numerics. It implements the explicit computational formulas derived in the 2026 breakthrough work using the **Numerical Periodic Normalization** and **Sun-Star Calculus** framework.
 
 ## 🚀 Key Features
 
@@ -26,10 +25,10 @@ Designed to work seamlessly as a plugin for the powerful [BifurcationKit.jl](htt
 This software is the numerical realization of a trilogy of theoretical advancements in the bifurcation theory of DDEs by **Bram Lentjes, Maikel M. Bosschaert, Len Spek, and Yuri A. Kuznetsov**.
 
 ### 1. The Numerical Breakthrough: Periodic Normalization
-**[Numerical Periodic Normalization at Codim 1 Bifurcations of Limit Cycles in DDEs](https://arxiv.org/abs/2505.19786)** This preprint bridges the gap between theory and code, providing the explicit formulas we implement. A major challenge in DDEs is solving the "homological equations" for normal form coefficients. This work introduces the **Characteristic Operator**, a crucial innovation that bypasses shooting methods entirely. It reformulates the abstract operator equations into Periodic Linear Boundary Value Problems. This allows us to use Orthogonal Collocation, solving for the solution over the entire period simultaneously, to compute the coefficients with high precision and stability.
+**[Numerical Periodic Normalization at Codim 1 Bifurcations of Limit Cycles in DDEs](https://bifurcationkit.github.io/BifurcationKitDocs.jl/stable/)** *SIAM Journal on Applied Dyanamical Systems (2026)* This paper bridges the gap between theory and code, providing the explicit formulas we implement. A major challenge in DDEs is solving the "homological equations" for normal form coefficients. This work introduces the **Characteristic Operator**, a crucial innovation that bypasses shooting methods entirely. It reformulates the abstract operator equations into Periodic Linear Boundary Value Problems. This allows us to use Orthogonal Collocation, solving for the solution over the entire period simultaneously, to compute the coefficients with high precision and stability.
 
 ### 2. The Framework: Periodic Normal Forms
-**[Periodic Normal Forms for Bifurcations of Limit Cycles in DDEs](https://www.sciencedirect.com/science/article/abs/pii/S0022039625000725)** *Journal of Differential Equations (2025)* This paper provides the rigorous theoretical construction of the periodic normalization framework. It establishes a coordinate system on the periodic center manifold using periodic smooth Jordan chains for the original and adjoint operators. This framework allows us to study the local dynamics on the periodic center mnaifold in terms of periodic normal forms.
+**[Periodic Normal Forms for Bifurcations of Limit Cycles in DDEs](https://www.sciencedirect.com/science/article/abs/pii/S0022039625000725)** *Journal of Differential Equations (2025)* This paper provides the rigorous theoretical construction of the periodic normalization framework. It establishes a coordinate system on the periodic center manifold using periodic smooth Jordan chains for the original and adjoint operators. This framework allows us to study the local dynamics on the periodic center manifold in terms of periodic normal forms.
 
 ### 3. The Foundation: Periodic Center Manifolds
 **[Periodic Center Manifolds for DDEs in the Light of Suns and Stars](https://link.springer.com/article/10.1007/s10884-023-10289-9)** *Journal of Dynamics and Differential Equations (2023)* This paper lays the necessary mathematical groundwork for the entire project. In Delay Differential Equations, the state space is infinite-dimensional because the system's future depends on its history, not just its current state. This "memory" makes standard geometric tools difficult to apply. This work overcomes those hurdles using the **Sun-Star Calculus** framework. It proves that despite the infinite-dimensional nature of the delays, there exists a smooth, finite-dimensional "center manifold" effectively capturing the critical dynamics. This method allows us to reduce the complex, infinite-dimensional DDE problem into a manageable, finite-dimensional form that our software can solve numerically.
