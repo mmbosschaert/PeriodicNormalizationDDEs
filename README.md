@@ -2,7 +2,7 @@
 
 > **Bifurcations of Limit Cycles in Delay Differential Equations: Theory & Software.**
 
-[![Publication](https://img.shields.io/badge/epubs.siam.org/doi/10.1137/25M1763573)](https://epubs.siam.org/doi/10.1137/25M1763573)
+[![Publication](https://img.shields.io/badge/DOI-10.1137%2F25M1763573-blue)](https://doi.org/10.1137/25M1763573)
 [![Julia](https://img.shields.io/badge/Julia-1.9+-9558B2.svg?logo=julia)](https://julialang.org)
 [![BifurcationKit](https://img.shields.io/badge/Plugin-BifurcationKit.jl-blue.svg)](https://bifurcationkit.github.io/BifurcationKitDocs.jl/stable/)
 
